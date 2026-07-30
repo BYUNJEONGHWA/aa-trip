@@ -147,13 +147,14 @@ export default function NaverMapContainer({
     }
   }, [places]);
 
-  // Initialize Naver Maps Instance
+  // Dynamic Script Injection & Map Instance Initialization for Mobile 100% Reliability
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    const initMap = () => {
-      if (!window.naver || !window.naver.maps) return;
+    const clientId = (process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID || '6h6sixegq1').trim();
 
+    const createMapInstance = () => {
+      if (!window.naver || !window.naver.maps) return;
       if (!mapRef.current) return;
 
       if (!naverMapInstance.current) {
@@ -173,6 +174,7 @@ export default function NaverMapContainer({
         setIsLoaded(true);
 
         // Immediate mobile resize recalculation
+        window.dispatchEvent(new Event('resize'));
         setTimeout(() => {
           window.dispatchEvent(new Event('resize'));
           if (map.setSize && mapRef.current) {
@@ -182,17 +184,31 @@ export default function NaverMapContainer({
       }
     };
 
+    // 1. If window.naver.maps already exists
     if (window.naver && window.naver.maps) {
-      initMap();
-    } else {
-      const timer = setInterval(() => {
-        if (window.naver && window.naver.maps) {
-          initMap();
-          clearInterval(timer);
-        }
-      }, 300);
-      return () => clearInterval(timer);
+      createMapInstance();
+      return;
     }
+
+    // 2. Check if script tag is already in DOM
+    const existingScript = document.getElementById('naver-map-script');
+    if (existingScript) {
+      existingScript.addEventListener('load', createMapInstance);
+      return () => existingScript.removeEventListener('load', createMapInstance);
+    }
+
+    // 3. Inject Script Dynamically into DOM
+    const script = document.createElement('script');
+    script.id = 'naver-map-script';
+    script.type = 'text/javascript';
+    script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${clientId}&submodules=geocoder`;
+    script.async = true;
+
+    script.onload = () => {
+      createMapInstance();
+    };
+
+    document.head.appendChild(script);
   }, []);
 
   // Robust Naver Map Resize Trigger Helper
@@ -511,8 +527,8 @@ export default function NaverMapContainer({
 
       {/* Main Naver Map Canvas Area */}
       <div
-        className="w-full h-[50vh] min-h-[380px] md:h-full relative z-10 box-border shrink-0"
-        style={{ width: '100%', minHeight: '380px', flexShrink: 0 }}
+        className="w-full h-[400px] min-h-[380px] md:h-full relative z-10 box-border shrink-0"
+        style={{ width: '100%', height: '400px', display: 'block', minHeight: '380px', flexShrink: 0 }}
       >
         {!isLoaded && (
           <div className="absolute inset-0 z-20 bg-slate-900/10 backdrop-blur-xs flex flex-col items-center justify-center gap-3 text-slate-700 font-extrabold text-xs">
@@ -523,7 +539,7 @@ export default function NaverMapContainer({
         <div
           ref={mapRef}
           className="w-full h-full min-h-[380px]"
-          style={{ width: '100%', height: '100%', minHeight: '380px', flexShrink: 0 }}
+          style={{ width: '100%', height: '400px', display: 'block', minHeight: '380px', flexShrink: 0 }}
         />
       </div>
 

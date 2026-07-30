@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from 'next';
-import Script from 'next/script';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -15,8 +14,6 @@ export const viewport: Viewport = {
   viewportFit: 'cover',
 };
 
-const navKey = (process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID || '').trim();
-
 export default function RootLayout({
   children,
 }: {
@@ -24,13 +21,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ko" className="light">
-      <head>
-        <Script
-          type="text/javascript"
-          src={`https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${navKey}&submodules=geocoder`}
-          strategy="beforeInteractive"
-        />
-      </head>
+      <head />
       <body className="antialiased bg-slate-50 text-slate-900 h-screen w-screen overflow-hidden font-sans pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
         {children}
       </body>

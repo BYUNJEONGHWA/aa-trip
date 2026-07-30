@@ -92,7 +92,7 @@ export default function DayColumn({ itinerary }: DayColumnProps) {
       onDragOver={handleNativeDragOver}
       onDragLeave={handleNativeDragLeave}
       onDrop={handleNativeDrop}
-      className={`w-80 flex-shrink-0 bg-white rounded-2xl border flex flex-col h-full overflow-hidden transition-all shadow-md ${
+      className={`w-full md:w-80 flex-shrink-0 bg-white rounded-2xl border flex flex-col md:h-full overflow-visible md:overflow-hidden transition-all shadow-md ${
         isHighlightedDrop
           ? 'border-emerald-500 ring-4 ring-emerald-500/30 bg-emerald-50/20 scale-[1.01]'
           : isActive
@@ -180,7 +180,7 @@ export default function DayColumn({ itinerary }: DayColumnProps) {
       {/* Scheduled Card List Area - Droppable & Sortable */}
       <div
         ref={setNodeRef}
-        className={`flex-1 overflow-y-auto p-3 space-y-2.5 min-h-[220px] transition-colors ${
+        className={`flex-1 md:overflow-y-auto overflow-visible p-3 space-y-2.5 min-h-[160px] transition-colors ${
           isHighlightedDrop ? 'bg-emerald-50/60 ring-2 ring-emerald-500/40' : 'bg-slate-50/40'
         }`}
       >

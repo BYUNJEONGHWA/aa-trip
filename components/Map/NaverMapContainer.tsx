@@ -5,7 +5,7 @@ import { useAppStore } from '@/lib/store';
 import { getDayColorTheme } from '@/lib/constants';
 import { Place, ScheduledPlace } from '@/lib/types';
 import { calculateDistanceKm, estimateTravelTimeMinutes, isPlaceClosedOnDate, getKoreanDayOfWeek } from '@/lib/routeOptimizer';
-import { Navigation, AlertTriangle, Maximize2, Minimize2, ChevronLeft, ChevronRight, Layers, MapPin, Sparkles, Calendar, RotateCcw } from 'lucide-react';
+import { Navigation, AlertTriangle, Maximize2, Minimize2, ChevronLeft, ChevronRight, Layers, MapPin, Sparkles, Calendar, RotateCcw, RefreshCw } from 'lucide-react';
 
 declare global {
   interface Window {
@@ -84,8 +84,7 @@ export default function NaverMapContainer({
     return places.filter((p) => isPlaceClosedOnDate(p, effectiveDateStr)).length;
   }, [places, effectiveDateStr]);
 
-  const envKey = process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID || '';
-  const clientId = (envKey.trim() || '6h6sixegq1').trim();
+  const clientId = (process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID || '').trim();
 
   // Create Place Map for quick O(1) lookup
   const placeMap = React.useMemo(() => {
@@ -170,6 +169,14 @@ export default function NaverMapContainer({
         const map = new window.naver.maps.Map(mapRef.current, mapOptions);
         naverMapInstance.current = map;
         setIsLoaded(true);
+
+        // Immediate mobile resize recalculation
+        setTimeout(() => {
+          window.dispatchEvent(new Event('resize'));
+          if (map.setSize && mapRef.current) {
+            map.setSize(new window.naver.maps.Size(mapRef.current.clientWidth, mapRef.current.clientHeight));
+          }
+        }, 150);
       }
     };
 
@@ -185,6 +192,22 @@ export default function NaverMapContainer({
       return () => clearInterval(timer);
     }
   }, []);
+
+  // Force recalculate map size on mobile view state / load changes
+  useEffect(() => {
+    if (isLoaded && naverMapInstance.current && window.naver?.maps) {
+      const timer = setTimeout(() => {
+        window.dispatchEvent(new Event('resize'));
+        const container = mapRef.current;
+        if (container && naverMapInstance.current.setSize) {
+          naverMapInstance.current.setSize(
+            new window.naver.maps.Size(container.clientWidth, container.clientHeight)
+          );
+        }
+      }, 200);
+      return () => clearTimeout(timer);
+    }
+  }, [isLoaded, mapViewState]);
 
   // Fit bounds ONLY once when map is loaded & places are available
   useEffect(() => {
@@ -471,8 +494,14 @@ export default function NaverMapContainer({
       )}
 
       {/* Main Naver Map Canvas Area */}
-      <div className="w-full h-full relative z-10">
-        <div ref={mapRef} className="w-full h-full min-h-[500px]" />
+      <div className="w-full h-full min-h-[350px] sm:min-h-[500px] relative z-10 box-border overflow-hidden">
+        {!isLoaded && (
+          <div className="absolute inset-0 z-20 bg-slate-900/10 backdrop-blur-xs flex flex-col items-center justify-center gap-3 text-slate-700 font-extrabold text-xs">
+            <RefreshCw className="w-7 h-7 text-emerald-600 animate-spin" />
+            <span>네이버 지도 SDK 불러오는 중...</span>
+          </div>
+        )}
+        <div ref={mapRef} className="w-full h-full min-h-[350px] sm:min-h-[500px]" />
       </div>
 
       {/* Bottom Summary Bar */}
@@ -497,7 +526,7 @@ export default function NaverMapContainer({
 
         <div className="flex items-center gap-1.5 text-emerald-800 text-[11px] font-bold bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span>NAVER Official Maps SDK (ncpKeyId: {clientId})</span>
+          <span>NAVER Official Maps SDK (Connected)</span>
         </div>
       </div>
     </div>

@@ -221,6 +221,7 @@ export default function Home() {
             <NaverMapContainer
               mapViewState={mapViewState}
               setMapViewState={setMapViewState}
+              isMobileVisible={mobileActiveView === 'MAP'}
             />
           </div>
         </div>

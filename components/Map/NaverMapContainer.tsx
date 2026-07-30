@@ -16,11 +16,13 @@ declare global {
 interface NaverMapContainerProps {
   mapViewState?: 'NORMAL' | 'MINIMIZED' | 'MAXIMIZED';
   setMapViewState?: (state: 'NORMAL' | 'MINIMIZED' | 'MAXIMIZED') => void;
+  isMobileVisible?: boolean;
 }
 
 export default function NaverMapContainer({
   mapViewState = 'NORMAL',
   setMapViewState,
+  isMobileVisible = true,
 }: NaverMapContainerProps) {
   const {
     places,
@@ -193,21 +195,35 @@ export default function NaverMapContainer({
     }
   }, []);
 
-  // Force recalculate map size on mobile view state / load changes
-  useEffect(() => {
-    if (isLoaded && naverMapInstance.current && window.naver?.maps) {
-      const timer = setTimeout(() => {
-        window.dispatchEvent(new Event('resize'));
-        const container = mapRef.current;
-        if (container && naverMapInstance.current.setSize) {
-          naverMapInstance.current.setSize(
-            new window.naver.maps.Size(container.clientWidth, container.clientHeight)
-          );
-        }
-      }, 200);
-      return () => clearTimeout(timer);
+  // Robust Naver Map Resize Trigger Helper
+  const triggerMapResize = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    window.dispatchEvent(new Event('resize'));
+    if (naverMapInstance.current && window.naver?.maps) {
+      window.naver.maps.Event.trigger(naverMapInstance.current, 'resize');
+      const container = mapRef.current;
+      if (container && container.clientWidth > 0 && container.clientHeight > 0) {
+        naverMapInstance.current.setSize(
+          new window.naver.maps.Size(container.clientWidth, container.clientHeight)
+        );
+      }
     }
-  }, [isLoaded, mapViewState]);
+  }, []);
+
+  // Force recalculate map size on mobile view state, load, & mobile tab switching
+  useEffect(() => {
+    if (isLoaded) {
+      triggerMapResize();
+      const timer1 = setTimeout(triggerMapResize, 50);
+      const timer2 = setTimeout(triggerMapResize, 200);
+      const timer3 = setTimeout(triggerMapResize, 500);
+      return () => {
+        clearTimeout(timer1);
+        clearTimeout(timer2);
+        clearTimeout(timer3);
+      };
+    }
+  }, [isLoaded, mapViewState, isMobileVisible, triggerMapResize]);
 
   // Fit bounds ONLY once when map is loaded & places are available
   useEffect(() => {
@@ -494,14 +510,21 @@ export default function NaverMapContainer({
       )}
 
       {/* Main Naver Map Canvas Area */}
-      <div className="w-full h-[55vh] min-h-[360px] md:h-full relative z-10 box-border shrink-0">
+      <div
+        className="w-full h-[50vh] min-h-[380px] md:h-full relative z-10 box-border shrink-0"
+        style={{ width: '100%', minHeight: '380px', flexShrink: 0 }}
+      >
         {!isLoaded && (
           <div className="absolute inset-0 z-20 bg-slate-900/10 backdrop-blur-xs flex flex-col items-center justify-center gap-3 text-slate-700 font-extrabold text-xs">
             <RefreshCw className="w-7 h-7 text-emerald-600 animate-spin" />
             <span>네이버 지도 SDK 불러오는 중...</span>
           </div>
         )}
-        <div ref={mapRef} className="w-full h-full min-h-[360px]" />
+        <div
+          ref={mapRef}
+          className="w-full h-full min-h-[380px]"
+          style={{ width: '100%', height: '100%', minHeight: '380px', flexShrink: 0 }}
+        />
       </div>
 
       {/* Bottom Summary Bar & Mobile Saved Places Day-Off Status */}

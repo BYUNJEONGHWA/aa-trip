@@ -147,6 +147,15 @@ export default function NaverMapContainer({
     }
   }, [places]);
 
+  const [authDomain, setAuthDomain] = useState<string | null>(null);
+
+  // Set current hostname for domain auth troubleshooting
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setAuthDomain(window.location.host);
+    }
+  }, []);
+
   // Dynamic Script Injection & Map Instance Initialization for Mobile 100% Reliability
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -197,11 +206,11 @@ export default function NaverMapContainer({
       return () => existingScript.removeEventListener('load', createMapInstance);
     }
 
-    // 3. Inject Script Dynamically into DOM
+    // 3. Inject Script Dynamically into DOM with ncpClientId & ncpKeyId fallback
     const script = document.createElement('script');
     script.id = 'naver-map-script';
     script.type = 'text/javascript';
-    script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${clientId}&submodules=geocoder`;
+    script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${clientId}&ncpKeyId=${clientId}&submodules=geocoder`;
     script.async = true;
 
     script.onload = () => {
@@ -531,9 +540,17 @@ export default function NaverMapContainer({
         style={{ width: '100%', height: '400px', display: 'block', minHeight: '380px', flexShrink: 0 }}
       >
         {!isLoaded && (
-          <div className="absolute inset-0 z-20 bg-slate-900/10 backdrop-blur-xs flex flex-col items-center justify-center gap-3 text-slate-700 font-extrabold text-xs">
-            <RefreshCw className="w-7 h-7 text-emerald-600 animate-spin" />
-            <span>네이버 지도 SDK 불러오는 중...</span>
+          <div className="absolute inset-0 z-20 bg-slate-900/40 backdrop-blur-xs flex flex-col items-center justify-center p-4 text-center gap-2 text-white font-extrabold text-xs">
+            <RefreshCw className="w-7 h-7 text-emerald-400 animate-spin" />
+            <span className="text-sm font-black">네이버 지도 SDK 불러오는 중...</span>
+            {authDomain && (
+              <div className="mt-2 text-[11px] text-slate-800 bg-white p-3 rounded-xl border border-slate-300 shadow-lg max-w-xs text-left leading-snug">
+                💡 <strong>현재 접속 도메인:</strong> <code className="text-emerald-700 font-bold bg-slate-100 px-1 py-0.5 rounded">{authDomain}</code><br/>
+                <span className="text-slate-500 font-medium text-[10px] mt-1 block">
+                  모바일 브라우저에서 안 보일 경우, Naver Cloud 콘솔 (AI.Naver API &gt; Web Dynamic Map)의 &quot;Web 서비스 URL&quot;에 위 도메인이 등록되어 있는지 확인해 보세요.
+                </span>
+              </div>
+            )}
           </div>
         )}
         <div

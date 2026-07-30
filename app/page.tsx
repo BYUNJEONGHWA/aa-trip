@@ -179,12 +179,12 @@ export default function Home() {
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="flex flex-col h-screen w-screen bg-slate-100 overflow-hidden font-sans">
+      <div className="flex flex-col h-full min-h-screen w-screen bg-slate-100 overflow-y-auto md:h-screen md:overflow-hidden font-sans">
         {/* Top Navigation Header */}
         <Header />
 
         {/* Main Workspace Layout (Desktop Side-by-Side / Mobile Single View) */}
-        <div className="flex-1 flex overflow-hidden relative">
+        <div className="flex-1 flex flex-col md:flex-row overflow-y-auto md:overflow-hidden relative min-h-0">
           {/* Left Sidebar: Places Ingestion & Day-Off Filters */}
           <div className={`${mobileActiveView === 'PLACES' ? 'flex w-full' : 'hidden'} md:flex md:w-80 h-full shrink-0`}>
             <Sidebar />

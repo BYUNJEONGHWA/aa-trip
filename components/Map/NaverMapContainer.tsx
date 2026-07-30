@@ -387,38 +387,38 @@ export default function NaverMapContainer({
   }
 
   return (
-    <div className="w-full h-full relative flex flex-col bg-slate-100 border-l border-slate-200">
-      {/* Top Floating Controls Bar */}
-      <div className="absolute top-4 left-4 right-4 z-20 bg-white/95 backdrop-blur-md p-2.5 rounded-xl border border-slate-200 shadow-md flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-2">
+    <div className="w-full h-full relative flex flex-col bg-slate-100 border-l border-slate-200 overflow-y-auto md:overflow-hidden">
+      {/* Top Controls Bar (Desktop: Floating Absolute / Mobile: Static Stack) */}
+      <div className="relative md:absolute md:top-4 md:left-4 md:right-4 z-20 bg-white/95 backdrop-blur-md p-2.5 rounded-none md:rounded-xl border-b md:border border-slate-200 shadow-xs md:shadow-md flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-1.5 flex-wrap">
           {/* View Tab Toggle */}
           <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs">
             <button
               onClick={() => setActiveTab('ALL')}
-              className={`px-3 py-1 rounded-md font-bold transition-all ${
+              className={`px-2.5 py-1 rounded-md font-bold transition-all text-xs ${
                 activeTab === 'ALL'
                   ? 'bg-white text-slate-900 shadow-xs'
                   : 'text-slate-500 hover:text-slate-900'
               }`}
             >
-              전체 동선 보기
+              전체 동선
             </button>
             <button
               onClick={() => setActiveTab('ACTIVE_DAY')}
-              className={`px-3 py-1 rounded-md font-bold transition-all ${
+              className={`px-2.5 py-1 rounded-md font-bold transition-all text-xs ${
                 activeTab === 'ACTIVE_DAY'
                   ? 'bg-white text-slate-900 shadow-xs'
                   : 'text-slate-500 hover:text-slate-900'
               }`}
             >
-              선택 일차만 보기 ({activeDayIndex + 1}일차)
+              선택 일차만 ({activeDayIndex + 1}일차)
             </button>
           </div>
 
           <button
             onClick={fitMapToBounds}
             className="flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 font-bold rounded-lg border border-slate-200 shadow-2xs transition-all text-xs"
-            title="모든 장소가 한눈에 보이도록 지도 카메라 화면 범위 자동 맞춤"
+            title="모든 장소가 한눈에 보이도록 지도 화면 카메라 범위 자동 맞춤"
           >
             <Maximize2 className="w-3.5 h-3.5 text-emerald-600" />
             <span>범위 맞춤</span>
@@ -427,9 +427,9 @@ export default function NaverMapContainer({
 
         {/* Interactive Map Calendar Date Selector Widget */}
         <div className="flex items-center gap-1.5 flex-wrap">
-          <div className="flex items-center gap-1.5 bg-rose-50/90 text-rose-800 border border-rose-200 px-2.5 py-1 rounded-lg text-xs font-black shadow-xs">
+          <div className="flex items-center gap-1.5 bg-rose-50/90 text-rose-800 border border-rose-200 px-2 py-1 rounded-lg text-xs font-black shadow-xs">
             <Calendar className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-            <span className="text-[11px] font-bold text-rose-900">휴무 조회:</span>
+            <span className="text-[11px] font-bold text-rose-900 hidden sm:inline">휴무 조회:</span>
             <input
               type="date"
               value={effectiveDateStr}
@@ -437,9 +437,9 @@ export default function NaverMapContainer({
               className="bg-white border border-rose-300 rounded px-1.5 py-0.5 text-xs font-black text-rose-900 focus:outline-none focus:ring-2 focus:ring-rose-400 cursor-pointer shadow-2xs"
             />
             <span className="text-[11px] font-extrabold text-rose-700">
-              ({effectiveKoreanDay}요일)
+              ({effectiveKoreanDay})
             </span>
-            <span className="bg-rose-600 text-white text-[10px] px-1.5 py-0.5 rounded-full font-black ml-0.5">
+            <span className="bg-rose-600 text-white text-[10px] px-1.5 py-0.5 rounded-full font-black ml-0.5 shrink-0">
               ⚠️ {closedPlacesCount}곳 휴무
             </span>
 
@@ -450,16 +450,16 @@ export default function NaverMapContainer({
                 title="스케줄러 선택 날짜로 복원"
               >
                 <RotateCcw className="w-2.5 h-2.5" />
-                <span>스케줄 날짜로</span>
+                <span className="hidden sm:inline">스케줄 날짜로</span>
               </button>
             )}
           </div>
 
-          <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+          <div className="hidden md:flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
             <button
               onClick={() => setMapViewState?.('MINIMIZED')}
               className="p-1.5 rounded hover:bg-white text-slate-600 hover:text-slate-900 transition-colors"
-              title="지도 접기 (스케줄러 넓게 보기)"
+              title="지도 접기"
             >
               <Minimize2 className="w-3.5 h-3.5" />
             </button>
@@ -468,7 +468,7 @@ export default function NaverMapContainer({
               <button
                 onClick={() => setMapViewState?.('MAXIMIZED')}
                 className="p-1.5 rounded hover:bg-white text-slate-600 hover:text-slate-900 transition-colors"
-                title="지도 크게 보기 (전체 화면)"
+                title="지도 크게 보기"
               >
                 <Maximize2 className="w-3.5 h-3.5" />
               </button>
@@ -476,7 +476,7 @@ export default function NaverMapContainer({
               <button
                 onClick={() => setMapViewState?.('NORMAL')}
                 className="p-1.5 rounded hover:bg-white text-slate-600 hover:text-slate-900 transition-colors"
-                title="기본 분할 화면으로 복원"
+                title="복원"
               >
                 <Layers className="w-3.5 h-3.5 text-emerald-600" />
               </button>
@@ -494,39 +494,75 @@ export default function NaverMapContainer({
       )}
 
       {/* Main Naver Map Canvas Area */}
-      <div className="w-full h-full min-h-[350px] sm:min-h-[500px] relative z-10 box-border overflow-hidden">
+      <div className="w-full h-[55vh] min-h-[360px] md:h-full relative z-10 box-border shrink-0">
         {!isLoaded && (
           <div className="absolute inset-0 z-20 bg-slate-900/10 backdrop-blur-xs flex flex-col items-center justify-center gap-3 text-slate-700 font-extrabold text-xs">
             <RefreshCw className="w-7 h-7 text-emerald-600 animate-spin" />
             <span>네이버 지도 SDK 불러오는 중...</span>
           </div>
         )}
-        <div ref={mapRef} className="w-full h-full min-h-[350px] sm:min-h-[500px]" />
+        <div ref={mapRef} className="w-full h-full min-h-[360px]" />
       </div>
 
-      {/* Bottom Summary Bar */}
-      <div className="absolute bottom-4 left-4 right-4 z-20 bg-white/95 backdrop-blur-md p-3 rounded-xl border border-slate-200 text-xs text-slate-700 shadow-lg flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-1.5 text-slate-500 font-semibold">
-            <Navigation className="w-4 h-4 text-emerald-600" />
+      {/* Bottom Summary Bar & Mobile Saved Places Day-Off Status */}
+      <div className="relative md:absolute md:bottom-4 md:left-4 md:right-4 z-20 bg-white/95 backdrop-blur-md p-3 rounded-none md:rounded-xl border-t md:border border-slate-200 text-xs text-slate-700 shadow-lg flex flex-col gap-3">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-1.5 text-slate-700 font-bold">
+            <Navigation className="w-4 h-4 text-emerald-600 shrink-0" />
             <span>선택 일차 ({activeDayIndex + 1}일차 - {activeDateStr} {activeWeekdayLabel}) 이동 요약:</span>
           </div>
-          <div className="flex items-center gap-3 font-extrabold text-slate-900">
-            <span className="bg-slate-100 px-2.5 py-1 rounded border border-slate-200">
+          <div className="flex items-center gap-2 font-extrabold text-slate-900 text-xs flex-wrap">
+            <span className="bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
               장소: <strong className="text-emerald-700">{daySummaries[activeDayIndex]?.count || 0}곳</strong>
             </span>
-            <span className="bg-slate-100 px-2.5 py-1 rounded border border-slate-200">
-              총 예상 거리: <strong className="text-blue-700">{daySummaries[activeDayIndex]?.totalDistance || 0} km</strong>
+            <span className="bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+              거리: <strong className="text-blue-700">{daySummaries[activeDayIndex]?.totalDistance || 0} km</strong>
             </span>
-            <span className="bg-slate-100 px-2.5 py-1 rounded border border-slate-200">
-              예상 이동 시간: <strong className="text-amber-700">{daySummaries[activeDayIndex]?.totalTime || 0} 분</strong>
+            <span className="bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+              시간: <strong className="text-amber-700">{daySummaries[activeDayIndex]?.totalTime || 0} 분</strong>
             </span>
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5 text-emerald-800 text-[11px] font-bold bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span>NAVER Official Maps SDK (Connected)</span>
+        {/* Mobile View Saved Places Open/Closed List */}
+        <div className="md:hidden pt-2 border-t border-slate-200">
+          <div className="font-extrabold text-xs text-slate-900 mb-2 flex items-center justify-between">
+            <span>📍 저장된 장소 영업/휴무 목록 ({places.length}곳)</span>
+            <span className="text-rose-600">⚠️ {closedPlacesCount}곳 휴무</span>
+          </div>
+          <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1 border rounded-lg p-1.5 bg-slate-50">
+            {places.map((p) => {
+              const isClosed = isPlaceClosedOnDate(p, effectiveDateStr);
+              return (
+                <div
+                  key={p.id}
+                  onClick={() => setSelectedPlaceId(p.id)}
+                  className={`p-2 rounded-lg text-xs font-bold flex items-center justify-between border cursor-pointer ${
+                    isClosed ? 'bg-rose-50 border-rose-200 text-rose-900' : 'bg-white border-slate-200 text-slate-800'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span>{isClosed ? '⚠️' : '📍'}</span>
+                    <span className="font-black">{p.name}</span>
+                  </div>
+                  <span
+                    className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
+                      isClosed ? 'bg-rose-600 text-white' : 'bg-emerald-100 text-emerald-800'
+                    }`}
+                  >
+                    {isClosed ? '실제 휴무' : '영업 중'}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between text-emerald-800 text-[11px] font-bold bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200">
+          <span className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span>NAVER Official Maps SDK (Connected)</span>
+          </span>
         </div>
       </div>
     </div>

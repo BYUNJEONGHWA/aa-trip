@@ -136,7 +136,7 @@ export default function Sidebar() {
   }, [places, filterDayOff, filterParkingOnly, searchQuery, selectedPlaceId]);
 
   return (
-    <aside className="w-80 h-full bg-white border-r border-slate-200 flex flex-col z-20 shrink-0 shadow-xs">
+    <aside className="w-full md:w-80 h-full bg-white border-r border-slate-200 flex flex-col z-20 shrink-0 shadow-xs">
       {/* Sidebar Header & Ingestion Trigger */}
       <div className="p-3.5 border-b border-slate-200 space-y-2.5">
         <div className="flex items-center justify-between">

@@ -37,11 +37,11 @@ export default function Header() {
   const isDbConnected = isSupabaseConfigured();
 
   return (
-    <header className="min-h-[56px] py-2 bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-3 sm:px-6 flex items-center justify-between gap-2 z-30 shrink-0 shadow-xs flex-wrap">
+    <header className="h-14 bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-3 sm:px-6 flex items-center justify-between gap-2 z-30 shrink-0 shadow-xs">
       {/* Brand Title */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 shrink-0">
         <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-white font-black shadow-md shadow-emerald-500/20 shrink-0">
-          <MapPin className="w-5 h-5 sm:w-6 sm:h-6 fill-white stroke-emerald-600" />
+          <MapPin className="w-4 h-4 sm:w-6 sm:h-6 fill-white stroke-emerald-600" />
         </div>
         <div>
           <div className="flex items-center gap-1.5">
@@ -56,33 +56,34 @@ export default function Header() {
       </div>
 
       {/* Structured & Grouped Action Toolbar */}
-      <div className="flex items-center gap-1.5 sm:gap-3 flex-wrap">
+      <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
         {/* Group 1: 장소 검색 & 불러오기 (Emerald Box) */}
         <div className="flex items-center gap-1 bg-emerald-50/80 p-1 rounded-xl border border-emerald-200/80">
           <button
             onClick={() => setIsSearchModalOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-2xs transition-all hover:scale-[1.02] active:scale-[0.98]"
+            className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-2xs transition-all hover:scale-[1.02] active:scale-[0.98]"
+            title="장소 검색"
           >
             <Search className="w-3.5 h-3.5 text-white" />
-            <span>장소 검색</span>
+            <span className="hidden sm:inline">장소 검색</span>
           </button>
           <button
             onClick={() => setIsIngestModalOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold border border-slate-200 transition-all shadow-2xs"
+            className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold border border-slate-200 transition-all shadow-2xs"
             title="네이버 지도 공유 URL 리스트 불러오기"
           >
             <Upload className="w-3.5 h-3.5 text-emerald-600" />
-            <span>리스트 불러오기</span>
+            <span className="hidden sm:inline">리스트 불러오기</span>
           </button>
         </div>
 
-        <div className="h-5 w-px bg-slate-200"></div>
+        <div className="h-5 w-px bg-slate-200 hidden sm:block"></div>
 
         {/* Group 2: DB & API 연동 설정 (Slate Box with Connection Status) */}
         <div className="flex items-center gap-1 bg-slate-100/80 p-1 rounded-xl border border-slate-200">
           <button
             onClick={() => setIsSupabaseModalOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-800 text-xs font-black transition-all shadow-2xs border border-slate-200/70"
+            className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-800 text-xs font-black transition-all shadow-2xs border border-slate-200/70"
             title="지역별 여행 폴더 관리 & Supabase DB 저장/불러오기"
           >
             <span
@@ -91,27 +92,27 @@ export default function Header() {
               }`}
             ></span>
             <Database className="w-3.5 h-3.5 text-emerald-600" />
-            <span>📁 여행 폴더 & DB</span>
+            <span className="hidden sm:inline">📁 여행 폴더 & DB</span>
           </button>
           <button
             onClick={() => setIsKeyModalOpen(true)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition-all shadow-2xs border border-slate-200/70"
+            className="flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition-all shadow-2xs border border-slate-200/70"
             title="네이버 지도 API 키 설정"
           >
             <Key className="w-3.5 h-3.5 text-amber-600" />
-            <span>API 키</span>
+            <span className="hidden sm:inline">API 키</span>
           </button>
         </div>
 
-        <div className="h-5 w-px bg-slate-200"></div>
+        <div className="h-5 w-px bg-slate-200 hidden sm:block"></div>
 
         {/* Group 3: 일정 공유 & Export (Primary Accent Box) */}
         <button
           onClick={() => setIsExportModalOpen(true)}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-black shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98]"
+          className="flex items-center gap-1 px-3 sm:px-4 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-black shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98]"
         >
           <Share2 className="w-3.5 h-3.5 text-emerald-400" />
-          <span>공유 / Export</span>
+          <span className="hidden sm:inline">공유 / Export</span>
         </button>
       </div>
 

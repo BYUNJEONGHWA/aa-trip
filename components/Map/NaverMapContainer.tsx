@@ -226,7 +226,8 @@ export default function NaverMapContainer({
       setIsAuthFailed(true);
     }
 
-    const clientId = (process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID || '6h6sixegq1').trim();
+    const storedKey = localStorage.getItem('NAVER_MAP_CLIENT_ID') || '';
+    const clientId = (storedKey || process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID || '6h6sixegq1').trim();
 
     // 1. If window.naver.maps already exists
     if (window.naver && window.naver.maps) {

@@ -42,12 +42,6 @@ export default function RootLayout({
             `,
           }}
         />
-        <Script
-          id="naver-map-script"
-          type="text/javascript"
-          src={`https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${navKey}&submodules=geocoder`}
-          strategy="beforeInteractive"
-        />
       </head>
       <body className="antialiased bg-slate-50 text-slate-900 h-screen w-screen overflow-hidden font-sans pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
         {children}

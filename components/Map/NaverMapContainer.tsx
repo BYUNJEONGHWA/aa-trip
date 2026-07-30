@@ -5,11 +5,14 @@ import { useAppStore } from '@/lib/store';
 import { getDayColorTheme } from '@/lib/constants';
 import { Place, ScheduledPlace } from '@/lib/types';
 import { calculateDistanceKm, estimateTravelTimeMinutes, isPlaceClosedOnDate, getKoreanDayOfWeek } from '@/lib/routeOptimizer';
-import { Navigation, AlertTriangle, Maximize2, Minimize2, ChevronLeft, ChevronRight, Layers, MapPin, Sparkles, Calendar, RotateCcw, RefreshCw } from 'lucide-react';
+import { Navigation, AlertTriangle, Maximize2, Minimize2, ChevronLeft, ChevronRight, Layers, MapPin, Sparkles, Calendar, RotateCcw, RefreshCw, Key } from 'lucide-react';
+import NaverKeyModal from '../Modals/NaverKeyModal';
 
 declare global {
   interface Window {
     naver: any;
+    __NAVER_MAP_AUTH_FAILED__?: boolean;
+    navermap_authFailure?: () => void;
   }
 }
 
@@ -75,6 +78,26 @@ export default function NaverMapContainer({
   const [activeTab, setActiveTab] = useState<'ALL' | 'ACTIVE_DAY'>('ALL');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [mapCustomDate, setMapCustomDate] = useState<string | null>(null);
+  const [isAuthFailed, setIsAuthFailed] = useState(false);
+  const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
+
+  // Listen for Naver Map API authentication failure event
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    if (window.__NAVER_MAP_AUTH_FAILED__) {
+      setIsAuthFailed(true);
+    }
+
+    const handleAuthFailed = () => {
+      setIsAuthFailed(true);
+    };
+
+    window.addEventListener('naver_map_auth_failed', handleAuthFailed);
+    return () => {
+      window.removeEventListener('naver_map_auth_failed', handleAuthFailed);
+    };
+  }, []);
 
   const activeItinerary = dayItineraries.find((it) => it.dayIndex === activeDayIndex);
   const activeDateStr = activeItinerary?.dateStr || '2026-08-16';
@@ -199,6 +222,10 @@ export default function NaverMapContainer({
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
+    if (window.__NAVER_MAP_AUTH_FAILED__) {
+      setIsAuthFailed(true);
+    }
+
     const clientId = (process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID || '6h6sixegq1').trim();
 
     // 1. If window.naver.maps already exists
@@ -214,11 +241,11 @@ export default function NaverMapContainer({
       return () => existingScript.removeEventListener('load', createMapInstance);
     }
 
-    // 3. Inject Script Dynamically into DOM with ncpClientId & ncpKeyId fallback
+    // 3. Inject Script Dynamically into DOM
     const script = document.createElement('script');
     script.id = 'naver-map-script';
     script.type = 'text/javascript';
-    script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${clientId}&ncpKeyId=${clientId}&submodules=geocoder`;
+    script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${clientId}&submodules=geocoder`;
     script.async = true;
 
     script.onload = () => {
@@ -552,7 +579,37 @@ export default function NaverMapContainer({
         className="w-full h-[400px] min-h-[380px] md:h-full relative z-10 box-border shrink-0"
         style={{ width: '100%', height: '400px', display: 'block', minHeight: '380px', flexShrink: 0 }}
       >
-        {!isLoaded && (
+        {isAuthFailed ? (
+          <div className="absolute inset-0 z-30 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center text-white space-y-4">
+            <div className="w-12 h-12 rounded-full bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400 shadow-lg animate-bounce">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <div className="space-y-1">
+              <h4 className="text-base font-extrabold text-rose-400">네이버 지도 인증 실패 (OpenAPI 3.0)</h4>
+              <p className="text-xs text-slate-300 max-w-sm">
+                네이버 클라우드 콘솔에 현재 접속 주소가 등록되어 있지 않거나 Client ID가 일치하지 않습니다.
+              </p>
+            </div>
+
+            <div className="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl max-w-sm w-full text-left text-xs space-y-2 shadow-2xl">
+              <div className="flex items-center justify-between text-slate-400 font-bold text-[11px]">
+                <span>현재 접속 URL</span>
+                <span className="font-mono text-emerald-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">{authDomain}</span>
+              </div>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                👉 <strong>해결 방법:</strong> 네이버 클라우드 콘솔 (<a href="https://console.ncloud.com" target="_blank" rel="noreferrer" className="text-emerald-400 underline font-bold">console.ncloud.com</a>) ➔ AI·NAVER API ➔ Application ➔ <strong>Web 서비스 URL</strong>에 <code className="text-emerald-300 font-bold">https://{authDomain}</code> 주소를 추가 등록하세요.
+              </p>
+            </div>
+
+            <button
+              onClick={() => setIsKeyModalOpen(true)}
+              className="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black transition-all shadow-lg flex items-center gap-1.5 cursor-pointer"
+            >
+              <Key className="w-4 h-4" />
+              <span>네이버 Client ID 변경하기</span>
+            </button>
+          </div>
+        ) : !isLoaded ? (
           <div className="absolute inset-0 z-20 bg-slate-900/40 backdrop-blur-xs flex flex-col items-center justify-center p-4 text-center gap-2 text-white font-extrabold text-xs">
             <RefreshCw className="w-7 h-7 text-emerald-400 animate-spin" />
             <span className="text-sm font-black">네이버 지도 SDK 불러오는 중...</span>
@@ -560,12 +617,12 @@ export default function NaverMapContainer({
               <div className="mt-2 text-[11px] text-slate-800 bg-white p-3 rounded-xl border border-slate-300 shadow-lg max-w-xs text-left leading-snug">
                 💡 <strong>현재 접속 도메인:</strong> <code className="text-emerald-700 font-bold bg-slate-100 px-1 py-0.5 rounded">{authDomain}</code><br/>
                 <span className="text-slate-500 font-medium text-[10px] mt-1 block">
-                  모바일 브라우저에서 안 보일 경우, Naver Cloud 콘솔 (AI.Naver API &gt; Web Dynamic Map)의 &quot;Web 서비스 URL&quot;에 위 도메인이 등록되어 있는지 확인해 보세요.
+                  모바일 브라우저나 Vercel에서 안 보일 경우, Naver Cloud 콘솔 (AI.Naver API &gt; Web Dynamic Map)의 &quot;Web 서비스 URL&quot;에 위 도메인이 등록되어 있는지 확인해 보세요.
                 </span>
               </div>
             )}
           </div>
-        )}
+        ) : null}
         <div
           ref={mapRef}
           className="w-full h-full min-h-[380px]"
@@ -634,6 +691,8 @@ export default function NaverMapContainer({
           </span>
         </div>
       </div>
+
+      <NaverKeyModal isOpen={isKeyModalOpen} onClose={() => setIsKeyModalOpen(false)} />
     </div>
   );
 }

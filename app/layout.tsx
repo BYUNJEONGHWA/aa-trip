@@ -26,6 +26,24 @@ export default function RootLayout({
     <html lang="ko" className="light">
       <head>
         <Script
+          id="naver-map-auth-failure-init"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.navermap_authFailure = function() {
+                console.error('[Naver Maps SDK] Authentication Failed (OpenAPI3.0 Unauthenticated)');
+                window.__NAVER_MAP_AUTH_FAILED__ = true;
+                if (typeof window !== 'undefined' && window.dispatchEvent) {
+                  window.dispatchEvent(new CustomEvent('naver_map_auth_failed'));
+                }
+              };
+              window.naver_map_auth_failure = window.navermap_authFailure;
+              window.navermap_auth_failure = window.navermap_authFailure;
+            `,
+          }}
+        />
+        <Script
+          id="naver-map-script"
           type="text/javascript"
           src={`https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${navKey}&submodules=geocoder`}
           strategy="beforeInteractive"

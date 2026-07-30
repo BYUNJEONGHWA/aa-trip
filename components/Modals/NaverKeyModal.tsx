@@ -80,19 +80,19 @@ export default function NaverKeyModal({ isOpen, onClose }: NaverKeyModalProps) {
           <div className="font-semibold text-emerald-400 flex items-center justify-between">
             <span>💡 인증 에러 방지 등록 주소 목록</span>
             <a
-              href="https://www.ncloud.com"
+              href="https://console.ncloud.com"
               target="_blank"
               rel="noreferrer"
-              className="text-slate-400 hover:text-white flex items-center gap-0.5 underline"
+              className="text-slate-400 hover:text-white flex items-center gap-0.5 underline font-bold"
             >
               ncloud 콘솔 <ExternalLink className="w-3 h-3" />
             </a>
           </div>
-          <p>네이버 콘솔 Web 서비스 URL 란에 아래 3개를 등록해 두시면 인증에러가 완전히 방지됩니다:</p>
+          <p>네이버 콘솔 Web 서비스 URL 란에 아래 주소들을 등록해 두시면 인증 에러가 방지됩니다:</p>
           <ul className="list-disc pl-4 space-y-0.5 font-mono text-emerald-300/90 text-[10px]">
+            <li>https://(Vercel 배포 주소, 예: https://aa-trip.vercel.app)</li>
             <li>http://localhost:3030</li>
             <li>http://127.0.0.1:3030</li>
-            <li>http://localhost</li>
           </ul>
         </div>
 

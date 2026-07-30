@@ -157,41 +157,49 @@ export default function NaverMapContainer({
   }, []);
 
   // Dynamic Script Injection & Map Instance Initialization for Mobile 100% Reliability
+  const createMapInstance = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    if (!window.naver || !window.naver.maps) return;
+    if (!mapRef.current) return;
+
+    // Do NOT initialize map inside a 0-width hidden container (wait until visible!)
+    const width = mapRef.current.clientWidth;
+    const height = mapRef.current.clientHeight;
+    if (width === 0 && height === 0 && !isMobileVisible) return;
+
+    if (!naverMapInstance.current) {
+      const defaultCenter = new window.naver.maps.LatLng(35.15, 126.90);
+      const mapOptions = {
+        center: defaultCenter,
+        zoom: 12,
+        zoomControl: true,
+        zoomControlOptions: {
+          position: window.naver.maps.Position.TOP_RIGHT,
+        },
+        mapTypeControl: false,
+      };
+
+      const map = new window.naver.maps.Map(mapRef.current, mapOptions);
+      naverMapInstance.current = map;
+      setIsLoaded(true);
+
+      // Immediate mobile resize recalculation
+      window.dispatchEvent(new Event('resize'));
+      setTimeout(() => {
+        window.dispatchEvent(new Event('resize'));
+        if (map.setSize && mapRef.current) {
+          const w = mapRef.current.clientWidth || 360;
+          const h = mapRef.current.clientHeight || 400;
+          map.setSize(new window.naver.maps.Size(w, h));
+        }
+      }, 150);
+    }
+  }, [isMobileVisible]);
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
     const clientId = (process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID || '6h6sixegq1').trim();
-
-    const createMapInstance = () => {
-      if (!window.naver || !window.naver.maps) return;
-      if (!mapRef.current) return;
-
-      if (!naverMapInstance.current) {
-        const defaultCenter = new window.naver.maps.LatLng(35.15, 126.90);
-        const mapOptions = {
-          center: defaultCenter,
-          zoom: 12,
-          zoomControl: true,
-          zoomControlOptions: {
-            position: window.naver.maps.Position.TOP_RIGHT,
-          },
-          mapTypeControl: false,
-        };
-
-        const map = new window.naver.maps.Map(mapRef.current, mapOptions);
-        naverMapInstance.current = map;
-        setIsLoaded(true);
-
-        // Immediate mobile resize recalculation
-        window.dispatchEvent(new Event('resize'));
-        setTimeout(() => {
-          window.dispatchEvent(new Event('resize'));
-          if (map.setSize && mapRef.current) {
-            map.setSize(new window.naver.maps.Size(mapRef.current.clientWidth, mapRef.current.clientHeight));
-          }
-        }, 150);
-      }
-    };
 
     // 1. If window.naver.maps already exists
     if (window.naver && window.naver.maps) {
@@ -218,26 +226,31 @@ export default function NaverMapContainer({
     };
 
     document.head.appendChild(script);
-  }, []);
+  }, [createMapInstance]);
 
-  // Robust Naver Map Resize Trigger Helper
+  // Robust Naver Map Resize & Re-initialization Trigger Helper
   const triggerMapResize = useCallback(() => {
     if (typeof window === 'undefined') return;
     window.dispatchEvent(new Event('resize'));
+    if (!naverMapInstance.current) {
+      createMapInstance();
+      return;
+    }
     if (naverMapInstance.current && window.naver?.maps) {
       window.naver.maps.Event.trigger(naverMapInstance.current, 'resize');
       const container = mapRef.current;
-      if (container && container.clientWidth > 0 && container.clientHeight > 0) {
-        naverMapInstance.current.setSize(
-          new window.naver.maps.Size(container.clientWidth, container.clientHeight)
-        );
+      if (container) {
+        const w = container.clientWidth || 360;
+        const h = container.clientHeight || 400;
+        naverMapInstance.current.setSize(new window.naver.maps.Size(w, h));
       }
     }
-  }, []);
+  }, [createMapInstance]);
 
   // Force recalculate map size on mobile view state, load, & mobile tab switching
   useEffect(() => {
-    if (isLoaded) {
+    if (isMobileVisible || isLoaded) {
+      createMapInstance();
       triggerMapResize();
       const timer1 = setTimeout(triggerMapResize, 50);
       const timer2 = setTimeout(triggerMapResize, 200);
@@ -248,7 +261,7 @@ export default function NaverMapContainer({
         clearTimeout(timer3);
       };
     }
-  }, [isLoaded, mapViewState, isMobileVisible, triggerMapResize]);
+  }, [isLoaded, mapViewState, isMobileVisible, triggerMapResize, createMapInstance]);
 
   // Fit bounds ONLY once when map is loaded & places are available
   useEffect(() => {

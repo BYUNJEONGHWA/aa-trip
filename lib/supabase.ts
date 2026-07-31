@@ -1,5 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { Place, ScheduledPlace, DayItinerary } from './types';
+import { addDays, format, parseISO } from 'date-fns';
+import { Place, ScheduledPlace, DayItinerary, DayOfWeek } from './types';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -151,6 +152,34 @@ export async function loadTripFromSupabase(tripId: string): Promise<SavedTripPay
     notesMap[d.day_index] = d.notes || '';
   });
 
+  const dayItineraries: DayItinerary[] = [];
+  const baseDate = parseISO(trip.start_date || format(new Date(), 'yyyy-MM-dd'));
+  const WEEKDAYS: DayOfWeek[] = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const KOREAN_WEEKDAYS: Record<DayOfWeek, string> = {
+    Mon: '월요일',
+    Tue: '화요일',
+    Wed: '수요일',
+    Thu: '목요일',
+    Fri: '금요일',
+    Sat: '토요일',
+    Sun: '일요일',
+  };
+
+  for (let i = 0; i < (trip.day_count || 1); i++) {
+    const currentDate = addDays(baseDate, i);
+    const dateStr = format(currentDate, 'yyyy-MM-dd');
+    const weekday = WEEKDAYS[currentDate.getDay()];
+    dayItineraries.push({
+      dayIndex: i,
+      title: `${i + 1}일차`,
+      dateStr,
+      weekday,
+      weekdayLabel: KOREAN_WEEKDAYS[weekday],
+      notes: notesMap[i] || '',
+      scheduleIds: [],
+    });
+  }
+
   return {
     tripId: trip.id,
     title: trip.title || '여행 일정',
@@ -158,7 +187,7 @@ export async function loadTripFromSupabase(tripId: string): Promise<SavedTripPay
     dayCount: trip.day_count,
     places,
     scheduledPlaces,
-    dayItineraries: [],
+    dayItineraries,
   };
 }
 

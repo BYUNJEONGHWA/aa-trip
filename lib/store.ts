@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import { addDays, format, parseISO } from 'date-fns';
 import { DayItinerary, DayOffFilter, DayOfWeek, Place, ScheduledPlace } from './types';
 import { optimizeRouteOrder } from './routeOptimizer';
+import { isSupabaseConfigured, saveTripToSupabase } from './supabase';
 
 const WEEKDAYS: DayOfWeek[] = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const KOREAN_WEEKDAYS: Record<DayOfWeek, string> = {
@@ -311,6 +312,20 @@ export const useAppStore = create<AppState>()(
             const updatedItineraries = state.dayItineraries.map((it) =>
               it.dayIndex === dayIndex ? { ...it, notes } : it
             );
+
+            // Auto-sync notes to Supabase if configured
+            if (isSupabaseConfigured()) {
+              saveTripToSupabase({
+                tripId: state.activeTripId,
+                title: state.activeTripTitle,
+                startDate: state.startDate,
+                dayCount: state.dayCount,
+                places: state.places,
+                scheduledPlaces: state.scheduledPlaces,
+                dayItineraries: updatedItineraries,
+              }).catch((e) => console.warn('Auto sync notes warn:', e));
+            }
+
             return { dayItineraries: updatedItineraries };
           });
         },
@@ -327,8 +342,25 @@ export const useAppStore = create<AppState>()(
         setIsSearchModalOpen: (open) => set({ isSearchModalOpen: open }),
         setIsSupabaseModalOpen: (open) => set({ isSupabaseModalOpen: open }),
 
-        loadFullTripState: ({ startDate, dayCount, places, scheduledPlaces }) => {
-          const newItineraries = buildDayItineraries(startDate, dayCount);
+        loadFullTripState: ({ startDate, dayCount, places, scheduledPlaces, dayItineraries }) => {
+          const state = get();
+          const notesMap: Record<number, string> = {};
+
+          // 1. Preserve notes passed from payload (e.g. Supabase DB)
+          if (dayItineraries && dayItineraries.length > 0) {
+            dayItineraries.forEach((it) => {
+              notesMap[it.dayIndex] = it.notes || '';
+            });
+          }
+
+          // 2. Fall back to existing state/localStorage notes if payload notes were empty
+          state.dayItineraries.forEach((it) => {
+            if (notesMap[it.dayIndex] === undefined || notesMap[it.dayIndex] === '') {
+              if (it.notes) notesMap[it.dayIndex] = it.notes;
+            }
+          });
+
+          const newItineraries = buildDayItineraries(startDate, dayCount, notesMap);
           set({
             startDate,
             dayCount,

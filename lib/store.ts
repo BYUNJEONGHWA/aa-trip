@@ -66,6 +66,8 @@ interface AppState {
   setIsSearchModalOpen: (open: boolean) => void;
   setIsSupabaseModalOpen: (open: boolean) => void;
   loadFullTripState: (payload: {
+    tripId?: string;
+    title?: string;
     startDate: string;
     dayCount: number;
     places: Place[];
@@ -342,7 +344,7 @@ export const useAppStore = create<AppState>()(
         setIsSearchModalOpen: (open) => set({ isSearchModalOpen: open }),
         setIsSupabaseModalOpen: (open) => set({ isSupabaseModalOpen: open }),
 
-        loadFullTripState: ({ startDate, dayCount, places, scheduledPlaces, dayItineraries }) => {
+        loadFullTripState: ({ tripId, title, startDate, dayCount, places, scheduledPlaces, dayItineraries }) => {
           const state = get();
           const notesMap: Record<number, string> = {};
 
@@ -362,6 +364,8 @@ export const useAppStore = create<AppState>()(
 
           const newItineraries = buildDayItineraries(startDate, dayCount, notesMap);
           set({
+            ...(tripId ? { activeTripId: tripId } : {}),
+            ...(title ? { activeTripTitle: title } : {}),
             startDate,
             dayCount,
             places,
@@ -375,6 +379,8 @@ export const useAppStore = create<AppState>()(
     {
       name: 'aa-trip-planner-storage',
       partialize: (state) => ({
+        activeTripId: state.activeTripId,
+        activeTripTitle: state.activeTripTitle,
         places: state.places,
         startDate: state.startDate,
         dayCount: state.dayCount,

@@ -48,14 +48,22 @@ export default function Home() {
     async function autoLoadFromSupabase() {
       if (isSupabaseConfigured()) {
         try {
-          const loaded = await loadTripFromSupabase('aa_trip_main');
-          if (loaded && loaded.places && loaded.places.length > 0) {
-            loadFullTripState({
-              startDate: loaded.startDate || '2026-08-16',
-              dayCount: loaded.dayCount || 3,
-              places: loaded.places,
-              scheduledPlaces: loaded.scheduledPlaces || [],
-            });
+          const currentTripId = activeTripId || 'aa_trip_main';
+          const loaded = await loadTripFromSupabase(currentTripId);
+          if (loaded) {
+            const targetTitle = loaded.title || activeTripTitle;
+            setActiveTrip(loaded.tripId, targetTitle);
+            if (loaded.places && loaded.places.length > 0) {
+              loadFullTripState({
+                tripId: loaded.tripId,
+                title: targetTitle,
+                startDate: loaded.startDate || '2026-08-16',
+                dayCount: loaded.dayCount || 3,
+                places: loaded.places,
+                scheduledPlaces: loaded.scheduledPlaces || [],
+                dayItineraries: loaded.dayItineraries || [],
+              });
+            }
           }
         } catch (e) {
           console.warn('Auto load from Supabase failed:', e);

@@ -83,13 +83,18 @@ export default function TripFolderTabs() {
 
     try {
       const loaded = await loadTripFromSupabase(trip.id);
+      const targetTitle = loaded?.title || trip.title || '여행 일정';
+      setActiveTrip(trip.id, targetTitle);
+
       if (loaded) {
-        setActiveTrip(trip.id, trip.title || '여행 일정');
         loadFullTripState({
+          tripId: trip.id,
+          title: targetTitle,
           startDate: loaded.startDate || '2026-08-16',
           dayCount: loaded.dayCount || 3,
           places: loaded.places || [],
           scheduledPlaces: loaded.scheduledPlaces || [],
+          dayItineraries: loaded.dayItineraries || [],
         });
       }
     } catch (e) {
@@ -116,6 +121,8 @@ export default function TripFolderTabs() {
 
       setActiveTrip(newTripId, title);
       loadFullTripState({
+        tripId: newTripId,
+        title,
         startDate: '2026-08-16',
         dayCount: 3,
         places: [],
@@ -145,12 +152,20 @@ export default function TripFolderTabs() {
     }
 
     try {
-      if (supabase) {
-        await supabase.from('trips').upsert({ id: tripId, title, updated_at: new Date().toISOString() });
-      }
-
       if (tripId === activeTripId) {
         setActiveTrip(tripId, title);
+      }
+
+      if (isSupabaseConfigured()) {
+        await saveTripToSupabase({
+          tripId,
+          title,
+          startDate,
+          dayCount,
+          places,
+          scheduledPlaces,
+          dayItineraries,
+        });
       }
 
       setEditingTripId(null);

@@ -196,12 +196,12 @@ export default function Home() {
               mobileActiveView === 'SCHEDULER' ? 'flex' : 'hidden'
             } md:flex ${
               mapViewState === 'MAXIMIZED' ? 'md:hidden' : 'flex-1'
-            } h-full bg-slate-50 overflow-hidden flex-col transition-all duration-300`}
+            } h-full min-h-0 bg-slate-50 overflow-hidden flex-col transition-all duration-300`}
           >
             {/* In-Scheduler Trip Folder Tab Bar & Real-time Auto-Save Status */}
             <TripFolderTabs />
 
-            <div className="flex-1 overflow-hidden">
+            <div className="flex-1 min-h-0 w-full overflow-hidden flex flex-col relative">
               <KanbanBoard />
             </div>
           </div>

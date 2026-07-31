@@ -92,7 +92,7 @@ export default function DayColumn({ itinerary }: DayColumnProps) {
       onDragOver={handleNativeDragOver}
       onDragLeave={handleNativeDragLeave}
       onDrop={handleNativeDrop}
-      className={`w-full md:w-80 flex-shrink-0 bg-white rounded-2xl border flex flex-col md:h-full overflow-visible md:overflow-hidden transition-all shadow-md ${
+      className={`w-full md:w-80 flex-shrink-0 bg-white rounded-2xl border flex flex-col h-auto md:h-full overflow-hidden transition-all shadow-md ${
         isHighlightedDrop
           ? 'border-emerald-500 ring-4 ring-emerald-500/30 bg-emerald-50/20 scale-[1.01]'
           : isActive
@@ -102,7 +102,7 @@ export default function DayColumn({ itinerary }: DayColumnProps) {
     >
       {/* Column Header */}
       <div
-        className="p-3.5 border-b border-slate-200 flex flex-col gap-2 relative bg-white"
+        className="p-3.5 border-b border-slate-200 flex flex-col gap-2 relative bg-white shrink-0"
         style={{
           borderTop: `4px solid ${theme.color}`,
         }}
@@ -158,7 +158,7 @@ export default function DayColumn({ itinerary }: DayColumnProps) {
       </div>
 
       {/* Action Toolbar */}
-      <div className="px-3.5 py-2 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs text-slate-600">
+      <div className="px-3.5 py-2 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs text-slate-600 shrink-0">
         <div className="flex items-center gap-2">
           <span className="font-bold text-slate-900">{daySchedules.length}개 장소</span>
         </div>
@@ -180,7 +180,7 @@ export default function DayColumn({ itinerary }: DayColumnProps) {
       {/* Scheduled Card List Area - Droppable & Sortable */}
       <div
         ref={setNodeRef}
-        className={`flex-1 md:overflow-y-auto overflow-visible p-3 space-y-2.5 min-h-[160px] transition-colors ${
+        className={`flex-1 overflow-y-auto max-h-[55vh] md:max-h-none p-3 space-y-2.5 min-h-[160px] touch-pan-y transition-colors ${
           isHighlightedDrop ? 'bg-emerald-50/60 ring-2 ring-emerald-500/40' : 'bg-slate-50/40'
         }`}
       >

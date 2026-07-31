@@ -3,7 +3,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Place } from '@/lib/types';
 import { useAppStore } from '@/lib/store';
-import { Clock, Calendar, Car, Plus, Star, MapPin, GripVertical } from 'lucide-react';
+import { Clock, Calendar, Car, Plus, Star, MapPin, GripVertical, Trash2 } from 'lucide-react';
 import { WEEKDAY_KOREAN } from '@/lib/constants';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
@@ -14,7 +14,7 @@ interface PlaceCardProps {
 }
 
 export default function PlaceCard({ place, isDragOverlay }: PlaceCardProps) {
-  const { activeDayIndex, addPlaceToDay, scheduledPlaces, selectedPlaceId } = useAppStore();
+  const { activeDayIndex, addPlaceToDay, removePlace, scheduledPlaces, selectedPlaceId } = useAppStore();
   const cardRef = useRef<HTMLDivElement | null>(null);
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
@@ -113,17 +113,32 @@ export default function PlaceCard({ place, isDragOverlay }: PlaceCardProps) {
           </p>
         </div>
 
-        {/* Quick Add to Active Day Button */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            addPlaceToDay(place.id, activeDayIndex);
-          }}
-          className="w-9 h-9 min-w-[36px] min-h-[36px] sm:w-7 sm:h-7 rounded-xl bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white flex items-center justify-center transition-all border border-emerald-200 hover:border-emerald-600 shrink-0 shadow-xs active:scale-95 cursor-pointer"
-          title={`${activeDayIndex + 1}일차에 빠른 추가`}
-        >
-          <Plus className="w-4 h-4 stroke-[3]" />
-        </button>
+        {/* Action Buttons: Quick Add & Delete */}
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              addPlaceToDay(place.id, activeDayIndex);
+            }}
+            className="w-8 h-8 rounded-xl bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white flex items-center justify-center transition-all border border-emerald-200 hover:border-emerald-600 shadow-2xs active:scale-95 cursor-pointer"
+            title={`${activeDayIndex + 1}일차 일정에 빠른 추가`}
+          >
+            <Plus className="w-4 h-4 stroke-[3]" />
+          </button>
+
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (window.confirm(`[${place.name}] 장소를 보관 목록에서 삭제하시겠습니까?`)) {
+                removePlace(place.id);
+              }
+            }}
+            className="w-8 h-8 rounded-xl bg-slate-50 hover:bg-rose-600 text-slate-400 hover:text-white flex items-center justify-center transition-all border border-slate-200 hover:border-rose-600 shadow-2xs active:scale-95 cursor-pointer"
+            title="보관 장소 목록에서 삭제"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
 
       {/* Operating Hours & Day-off Information */}

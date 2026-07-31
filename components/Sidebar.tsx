@@ -3,13 +3,14 @@
 import React, { useState } from 'react';
 import { useAppStore } from '@/lib/store';
 import PlaceCard from './PlaceCard';
-import { Search, Filter, PlusCircle, CheckCircle2, RefreshCw } from 'lucide-react';
+import { Search, Filter, PlusCircle, CheckCircle2, RefreshCw, Trash2 } from 'lucide-react';
 import { DayOffFilter, DayOfWeek, Place } from '@/lib/types';
 
 export default function Sidebar() {
   const {
     places,
     addPlaces,
+    removePlace,
     filterDayOff,
     setFilterDayOff,
     filterParkingOnly,
@@ -147,14 +148,31 @@ export default function Sidebar() {
             </span>
           </h2>
 
-          <button
-            onClick={() => setIsSearchModalOpen(true)}
-            className="text-xs text-emerald-800 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100/80 font-bold flex items-center gap-1 px-2.5 py-1 rounded-lg border border-emerald-300/80 transition-all whitespace-nowrap shadow-2xs"
-            title="네이버 지도 기반 새 장소 검색 및 추가"
-          >
-            <Search className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-            <span className="whitespace-nowrap">장소 검색</span>
-          </button>
+          <div className="flex items-center gap-1.5">
+            {places.length > 0 && (
+              <button
+                onClick={() => {
+                  if (window.confirm('보관된 모든 장소를 목록에서 전체 삭제하시겠습니까?')) {
+                    places.forEach((p) => removePlace(p.id));
+                  }
+                }}
+                className="text-[11px] text-slate-500 hover:text-rose-600 bg-slate-50 hover:bg-rose-50 font-bold flex items-center gap-1 px-2 py-1 rounded-lg border border-slate-200 hover:border-rose-200 transition-all whitespace-nowrap cursor-pointer"
+                title="보관 목록 전체 삭제"
+              >
+                <Trash2 className="w-3 h-3 shrink-0" />
+                <span className="hidden sm:inline">전체 비우기</span>
+              </button>
+            )}
+
+            <button
+              onClick={() => setIsSearchModalOpen(true)}
+              className="text-xs text-emerald-800 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100/80 font-bold flex items-center gap-1 px-2.5 py-1 rounded-lg border border-emerald-300/80 transition-all whitespace-nowrap shadow-2xs cursor-pointer"
+              title="네이버 지도 기반 새 장소 검색 및 추가"
+            >
+              <Search className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              <span className="whitespace-nowrap">장소 검색</span>
+            </button>
+          </div>
         </div>
 
         {/* Search Bar */}

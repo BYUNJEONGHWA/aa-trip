@@ -259,36 +259,68 @@ export default function NaverMapContainer({
   // Robust Naver Map Resize & Re-initialization Trigger Helper
   const triggerMapResize = useCallback(() => {
     if (typeof window === 'undefined') return;
-    window.dispatchEvent(new Event('resize'));
     if (!naverMapInstance.current) {
       createMapInstance();
       return;
     }
     if (naverMapInstance.current && window.naver?.maps) {
-      window.naver.maps.Event.trigger(naverMapInstance.current, 'resize');
       const container = mapRef.current;
       if (container) {
-        const w = container.clientWidth || 360;
-        const h = container.clientHeight || 400;
-        naverMapInstance.current.setSize(new window.naver.maps.Size(w, h));
+        const w = container.clientWidth;
+        const h = container.clientHeight;
+        if (w > 0 && h > 0) {
+          naverMapInstance.current.setSize(new window.naver.maps.Size(w, h));
+          window.naver.maps.Event.trigger(naverMapInstance.current, 'resize');
+        }
       }
     }
   }, [createMapInstance]);
 
-  // Force recalculate map size on mobile view state, load, & mobile tab switching
+  // Automated Naver Map Resizing via ResizeObserver & Window/Orientation Events
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const container = mapRef.current;
+    if (!container) return;
+
+    const handleResize = () => {
+      triggerMapResize();
+    };
+
+    let resizeObserver: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(() => {
+        handleResize();
+      });
+      resizeObserver.observe(container);
+    }
+
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleResize);
+
     if (isMobileVisible || isLoaded) {
       createMapInstance();
-      triggerMapResize();
-      const timer1 = setTimeout(triggerMapResize, 50);
-      const timer2 = setTimeout(triggerMapResize, 200);
-      const timer3 = setTimeout(triggerMapResize, 500);
+      handleResize();
+      const timer1 = setTimeout(handleResize, 100);
+      const timer2 = setTimeout(handleResize, 300);
       return () => {
+        if (resizeObserver && container) {
+          resizeObserver.disconnect();
+        }
+        window.removeEventListener('resize', handleResize);
+        window.removeEventListener('orientationchange', handleResize);
         clearTimeout(timer1);
         clearTimeout(timer2);
-        clearTimeout(timer3);
       };
     }
+
+    return () => {
+      if (resizeObserver && container) {
+        resizeObserver.disconnect();
+      }
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+    };
   }, [isLoaded, mapViewState, isMobileVisible, triggerMapResize, createMapInstance]);
 
   // Fit bounds ONLY once when map is loaded & places are available
@@ -577,8 +609,8 @@ export default function NaverMapContainer({
 
       {/* Main Naver Map Canvas Area */}
       <div
-        className="w-full h-[400px] min-h-[380px] md:h-full relative z-10 box-border shrink-0"
-        style={{ width: '100%', height: '400px', display: 'block', minHeight: '380px', flexShrink: 0 }}
+        className="w-full flex-1 min-h-[300px] h-full relative z-10 box-border overflow-hidden"
+        style={{ width: '100%', height: '100%' }}
       >
         {isAuthFailed ? (
           <div className="absolute inset-0 z-30 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center text-white space-y-4">
@@ -626,8 +658,8 @@ export default function NaverMapContainer({
         ) : null}
         <div
           ref={mapRef}
-          className="w-full h-full min-h-[380px]"
-          style={{ width: '100%', height: '400px', display: 'block', minHeight: '380px', flexShrink: 0 }}
+          className="w-full h-full min-h-[300px]"
+          style={{ width: '100%', height: '100%' }}
         />
       </div>
 

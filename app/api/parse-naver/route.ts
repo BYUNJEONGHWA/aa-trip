@@ -152,11 +152,41 @@ async function parseSinglePlaceBySid(sid: string): Promise<Place | null> {
       }
     }
 
-    // Extract explicit parking availability
-    const convMatch = pageHtml.match(/"convenience"\s*:\s*\[([^\]]*)\]/)?.[1] || pageHtml;
-    const hasParkingKeyword = /"주차"|"주차가능"|"무료주차"|"발렛파킹"|"주차장"|주차 가능|발렛파킹/.test(convMatch);
-    const hasNoParkingExplicit = /"no_parking"|"주차불가"|"주차 불가"|"주차 없음"/.test(convMatch);
-    let hasParking = hasParkingKeyword && !hasNoParkingExplicit;
+    // Extract explicit parking availability & detailed parking status text
+    const optionsMatch =
+      pageHtml.match(/"convenience"\s*:\s*\[([^\]]*)\]/)?.[1] ||
+      pageHtml.match(/"options"\s*:\s*"([^"]+)"/)?.[1] ||
+      pageHtml.match(/"facilityInfo"\s*:\s*\{([^}]*)\}/)?.[1] ||
+      pageHtml;
+
+    const hasFreeParking = /무료주차|무료\s*주차/.test(optionsMatch);
+    const hasValetParking = /발렛파킹|발렛/.test(optionsMatch);
+    const hasPaidParking = /유료주차|유료\s*주차/.test(optionsMatch);
+    const hasGeneralParking = /"주차"|"주차가능"|"주차장"|주차\s*가능|주차장\s*완비|주차|발렛파킹/.test(optionsMatch);
+    const hasNoParkingExplicit = /"no_parking"|"주차불가"|"주차\s*불가"|"주차\s*없음"|주차\s*불가|주차장\s*없음/.test(optionsMatch);
+
+    let hasParking = false;
+    let parkingText = '주차 정보 없음';
+
+    if (hasNoParkingExplicit) {
+      hasParking = false;
+      parkingText = '주차 불가';
+    } else if (hasFreeParking) {
+      hasParking = true;
+      parkingText = '무료 주차 가능';
+    } else if (hasValetParking) {
+      hasParking = true;
+      parkingText = '발렛파킹 가능';
+    } else if (hasPaidParking) {
+      hasParking = true;
+      parkingText = '유료 주차 가능';
+    } else if (hasGeneralParking) {
+      hasParking = true;
+      parkingText = '주차 가능';
+    } else {
+      hasParking = false;
+      parkingText = '주차 정보 없음';
+    }
 
     // Extract day offs
     const extractedClosedTexts: string[] = [];
@@ -201,6 +231,7 @@ async function parseSinglePlaceBySid(sid: string): Promise<Place | null> {
       off_days,
       scheduleDetail,
       hasParking,
+      parkingText,
       phone: '',
       rating: 4.5,
     };
@@ -346,7 +377,8 @@ export async function POST(req: NextRequest) {
 
           let hoursStr = '';
           let dayOffStr = '';
-          let hasParking = false; // Default to false unless explicitly confirmed by Naver
+          let hasParking = false;
+          let parkingText = '주차 정보 없음';
 
           // Fetch place summary details if sid exists
           if (sid) {
@@ -359,6 +391,7 @@ export async function POST(req: NextRequest) {
                 if (singleParsed.lat) lat = singleParsed.lat;
                 if (singleParsed.lng) lng = singleParsed.lng;
                 hasParking = singleParsed.hasParking;
+                parkingText = singleParsed.parkingText || (hasParking ? '주차 가능' : '주차 정보 없음');
 
                 if (singleParsed.operatingHours.display) {
                   hoursStr = singleParsed.operatingHours.display;
@@ -405,6 +438,7 @@ export async function POST(req: NextRequest) {
             off_days,
             scheduleDetail,
             hasParking,
+            parkingText,
             phone: item.phone || '',
             rating: 4.5 + (((i + idx) * 3) % 5) * 0.1,
           };

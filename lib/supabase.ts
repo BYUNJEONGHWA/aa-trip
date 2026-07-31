@@ -66,6 +66,8 @@ export async function saveTripToSupabase(payload: SavedTripPayload) {
       day_off_raw: p.dayOffRaw || null,
       holiday_text: p.holiday_text || null,
       off_rules: p.off_rules || [],
+      has_parking: p.hasParking,
+      parking_text: p.parkingText || null,
     }));
 
     const { error: placesError } = await supabase.from('places').upsert(placesData, { onConflict: 'id' });
@@ -122,7 +124,8 @@ export async function loadTripFromSupabase(tripId: string): Promise<SavedTripPay
     address: p.address || '',
     lat: p.lat,
     lng: p.lng,
-    hasParking: true,
+    hasParking: p.has_parking ?? p.hasParking ?? false,
+    parkingText: p.parking_text || p.parkingText || (p.has_parking ? '주차 가능' : '주차 정보 없음'),
     operatingHours: p.operating_hours || { open: '00:00', close: '24:00', display: '영업시간' },
     isEveryday: p.is_everyday ?? true,
     dayOffs: p.day_offs || [],

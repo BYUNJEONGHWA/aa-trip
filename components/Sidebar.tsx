@@ -43,6 +43,7 @@ export default function Sidebar() {
                 dayOffRaw: data.place.dayOffRaw,
                 holiday_text: data.place.holiday_text,
                 hasParking: data.place.hasParking,
+                parkingText: data.place.parkingText,
               });
               continue;
             }

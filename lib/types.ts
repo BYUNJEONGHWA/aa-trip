@@ -44,6 +44,7 @@ export interface Place {
   off_rules?: OffRule[]; // e.g. [{ day: "월", weeks: [2, 4] }]
   scheduleDetail?: ScheduleClassification;
   hasParking: boolean;
+  parkingText?: string;
   phone?: string;
   naverUrl?: string;
   rating?: number;

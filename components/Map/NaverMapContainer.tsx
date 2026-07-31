@@ -5,7 +5,7 @@ import { useAppStore } from '@/lib/store';
 import { getDayColorTheme } from '@/lib/constants';
 import { Place, ScheduledPlace } from '@/lib/types';
 import { calculateDistanceKm, estimateTravelTimeMinutes, isPlaceClosedOnDate, getKoreanDayOfWeek } from '@/lib/routeOptimizer';
-import { Navigation, AlertTriangle, Maximize2, Minimize2, ChevronLeft, ChevronRight, Layers, MapPin, Sparkles, Calendar, RotateCcw, RefreshCw, Key } from 'lucide-react';
+import { Navigation, AlertTriangle, Maximize2, Minimize2, ChevronLeft, ChevronRight, Layers, MapPin, Sparkles, Calendar, RotateCcw, RefreshCw, Key, Plus, X } from 'lucide-react';
 import NaverKeyModal from '../Modals/NaverKeyModal';
 
 declare global {
@@ -37,6 +37,7 @@ export default function NaverMapContainer({
     filterDayOff,
     setSelectedPlaceId,
     focusPlaceLocation,
+    addPlaceToDay,
   } = useAppStore();
 
   const mapRef = useRef<HTMLDivElement>(null);
@@ -80,6 +81,7 @@ export default function NaverMapContainer({
   const [mapCustomDate, setMapCustomDate] = useState<string | null>(null);
   const [isAuthFailed, setIsAuthFailed] = useState(false);
   const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
+  const [mobileAddModalPlace, setMobileAddModalPlace] = useState<Place | null>(null);
 
   // Listen for Naver Map API authentication failure event
   useEffect(() => {
@@ -402,23 +404,40 @@ export default function NaverMapContainer({
       });
 
       window.naver.maps.Event.addListener(marker, 'click', () => {
+        const isMobile =
+          typeof window !== 'undefined' &&
+          (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+            window.innerWidth < 768);
+
         const state = useAppStore.getState();
-        if (state.selectedPlaceId === place.id) {
-          // Second click on already selected place -> Add to active day schedule!
-          state.addPlaceToDay(place.id, state.activeDayIndex);
-          setToastMessage(`✨ [${place.name}]이(가) ${state.activeDayIndex + 1}일차 일정에 추가되었습니다!`);
-          setTimeout(() => setToastMessage(null), 2500);
+        setSelectedPlaceId(place.id);
+
+        if (isMobile) {
+          // Mobile: Single tap opens the "Select Day to Add" modal popup
+          setMobileAddModalPlace(place);
         } else {
-          // First click -> Select place
-          setSelectedPlaceId(place.id);
+          // PC Desktop: Second click on already selected place -> Add to active day
+          if (state.selectedPlaceId === place.id) {
+            state.addPlaceToDay(place.id, state.activeDayIndex);
+            setToastMessage(`✨ [${place.name}]이(가) ${state.activeDayIndex + 1}일차 일정에 추가되었습니다!`);
+            setTimeout(() => setToastMessage(null), 2500);
+          }
         }
       });
 
       window.naver.maps.Event.addListener(marker, 'dblclick', () => {
-        const state = useAppStore.getState();
-        state.addPlaceToDay(place.id, state.activeDayIndex);
-        setToastMessage(`✨ [${place.name}]이(가) ${state.activeDayIndex + 1}일차 일정에 추가되었습니다!`);
-        setTimeout(() => setToastMessage(null), 2500);
+        const isMobile =
+          typeof window !== 'undefined' &&
+          (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+            window.innerWidth < 768);
+
+        if (!isMobile) {
+          // PC Desktop: Double-click adds place immediately to current active day schedule
+          const state = useAppStore.getState();
+          state.addPlaceToDay(place.id, state.activeDayIndex);
+          setToastMessage(`✨ [${place.name}]이(가) ${state.activeDayIndex + 1}일차 일정에 추가되었습니다!`);
+          setTimeout(() => setToastMessage(null), 2500);
+        }
       });
 
       markersRef.current.push(marker);
@@ -724,6 +743,88 @@ export default function NaverMapContainer({
           </span>
         </div>
       </div>
+
+      {/* Mobile Single-Tap "Which Day to Add?" Modal Popup */}
+      {mobileAddModalPlace && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-slate-800 rounded-t-3xl sm:rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4 text-white relative">
+            <button
+              onClick={() => setMobileAddModalPlace(null)}
+              className="absolute top-5 right-5 text-slate-400 hover:text-white p-1.5 rounded-xl hover:bg-slate-800 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3 pr-8">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
+                <Plus className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[10px] font-black text-emerald-400 uppercase tracking-wider bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800">
+                  모바일 일정 추가
+                </span>
+                <h3 className="text-base font-bold text-white truncate max-w-[240px]">
+                  {mobileAddModalPlace.name}
+                </h3>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-300 font-medium">
+              어느 여행 일차 일정에 추가하시겠습니까?
+            </p>
+
+            <div className="grid grid-cols-1 gap-2.5 max-h-64 overflow-y-auto pt-1">
+              {dayItineraries.map((it) => {
+                const dayTheme = getDayColorTheme(it.dayIndex);
+                const currentCount = scheduledPlaces.filter((s) => s.dayIndex === it.dayIndex).length;
+
+                return (
+                  <button
+                    key={it.dayIndex}
+                    onClick={() => {
+                      addPlaceToDay(mobileAddModalPlace.id, it.dayIndex);
+                      setToastMessage(
+                        `✨ [${mobileAddModalPlace.name}]이(가) ${it.dayIndex + 1}일차 일정에 추가되었습니다!`
+                      );
+                      setMobileAddModalPlace(null);
+                      setTimeout(() => setToastMessage(null), 2500);
+                    }}
+                    className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-emerald-500/50 transition-all text-left group cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`px-3 py-1 rounded-xl text-xs font-black text-white ${dayTheme.badgeBg} shadow-sm`}
+                      >
+                        {it.dayIndex + 1}일차
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                          <span>{it.dateStr}</span>
+                          <span className="text-[11px] text-slate-400">({it.weekdayLabel})</span>
+                        </div>
+                        <span className="text-[10px] text-slate-400 font-medium">
+                          현재 일정: {currentCount}곳 장소
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="w-8 h-8 rounded-xl bg-slate-900 border border-slate-800 group-hover:bg-emerald-500 group-hover:text-slate-950 text-slate-400 flex items-center justify-center transition-all">
+                      <Plus className="w-4 h-4" />
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              onClick={() => setMobileAddModalPlace(null)}
+              className="w-full py-3 rounded-xl border border-slate-800 text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            >
+              취소
+            </button>
+          </div>
+        </div>
+      )}
 
       <NaverKeyModal isOpen={isKeyModalOpen} onClose={() => setIsKeyModalOpen(false)} />
     </div>

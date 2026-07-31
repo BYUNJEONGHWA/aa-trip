@@ -29,6 +29,9 @@ import { MapPin, Calendar, Map as MapIcon } from 'lucide-react';
 
 export default function Home() {
   const {
+    activeTripId,
+    activeTripTitle,
+    setActiveTrip,
     addPlaceToDay,
     moveScheduleToDay,
     reorderDaySchedule,

@@ -81,7 +81,11 @@ export default function Home() {
     async function autoUpdateOperatingHours() {
       if (places.length === 0) return;
       const outdatedPlaces = places.filter(
-        (p) => !p.operatingHours || (p.operatingHours.open === '09:00' && p.operatingHours.close === '21:00')
+        (p) =>
+          !p.operatingHours ||
+          (p.operatingHours.open === '09:00' && p.operatingHours.close === '21:00') ||
+          !p.parkingText ||
+          p.parkingText === '주차 정보 없음'
       );
 
       if (outdatedPlaces.length > 0) {
@@ -107,6 +111,7 @@ export default function Home() {
                         dayOffRaw: data.place.dayOffRaw,
                         holiday_text: data.place.holiday_text,
                         hasParking: data.place.hasParking,
+                        parkingText: data.place.parkingText,
                       });
                     }
                   }

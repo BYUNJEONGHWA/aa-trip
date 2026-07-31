@@ -71,31 +71,36 @@ async function resolveNaverShareId(inputUrl: string): Promise<string> {
  */
 async function parseSinglePlaceBySid(sid: string): Promise<Place | null> {
   try {
-    let pageHtml = '';
-    let placePageRes = await fetch(`https://m.place.naver.com/restaurant/${sid}/home`, {
-      headers: {
-        'User-Agent':
-          'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
-        'Accept-Language': 'ko-KR,ko;q=0.9',
-      },
-    });
+    const headers = {
+      'User-Agent':
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+      'Accept-Language': 'ko-KR,ko;q=0.9',
+    };
 
-    if (placePageRes.ok) {
-      pageHtml = await placePageRes.text();
-    } else {
-      placePageRes = await fetch(`https://m.place.naver.com/place/${sid}/home`, {
-        headers: {
-          'User-Agent':
-            'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
-          'Accept-Language': 'ko-KR,ko;q=0.9',
-        },
-      });
-      if (placePageRes.ok) {
-        pageHtml = await placePageRes.text();
-      }
+    let homeHtml = '';
+    let infoHtml = '';
+
+    // Fetch both /home and /information (Information tab containing 주차 details) in parallel
+    const [resHomeRest, resInfoRest] = await Promise.all([
+      fetch(`https://m.place.naver.com/restaurant/${sid}/home`, { headers }),
+      fetch(`https://m.place.naver.com/restaurant/${sid}/information`, { headers }),
+    ]);
+
+    if (resHomeRest.ok) homeHtml = await resHomeRest.text();
+    if (resInfoRest.ok) infoHtml = await resInfoRest.text();
+
+    // Fallback to /place/{sid}/home and /place/{sid}/information if restaurant 404s
+    if (!homeHtml) {
+      const [resHomePlace, resInfoPlace] = await Promise.all([
+        fetch(`https://m.place.naver.com/place/${sid}/home`, { headers }),
+        fetch(`https://m.place.naver.com/place/${sid}/information`, { headers }),
+      ]);
+      if (resHomePlace.ok) homeHtml = await resHomePlace.text();
+      if (resInfoPlace.ok) infoHtml = await resInfoPlace.text();
     }
 
-    if (!pageHtml) return null;
+    const pageHtml = `${homeHtml}\n${infoHtml}`;
+    if (!pageHtml.trim()) return null;
 
     // Extract Name & Category
     const nameMatch = pageHtml.match(/"name"\s*:\s*"([^"]+)"/);
@@ -152,37 +157,69 @@ async function parseSinglePlaceBySid(sid: string): Promise<Place | null> {
       }
     }
 
-    // Extract explicit parking availability & detailed parking status text
-    const optionsMatch =
+    // Extract explicit parking availability & detailed parking status text from Information tab
+    let parkingText = '';
+    let hasParking = false;
+
+    // 1. Direct JSON matching for parking properties in Information tab HTML
+    const parkingJsonMatch =
+      pageHtml.match(/"parking"\s*:\s*\{([^}]*)\}/) ||
+      pageHtml.match(/"parkingInfo"\s*:\s*"([^"]+)"/) ||
+      pageHtml.match(/"parkingText"\s*:\s*"([^"]+)"/) ||
+      pageHtml.match(/"parkingFee"\s*:\s*"([^"]+)"/) ||
+      pageHtml.match(/"parkingType"\s*:\s*"([^"]+)"/);
+
+    if (parkingJsonMatch && parkingJsonMatch[1]) {
+      const rawJsonVal = parkingJsonMatch[1];
+      if (rawJsonVal && !rawJsonVal.includes('{{')) {
+        const textExtract = rawJsonVal.replace(/"[^"]+"\s*:/g, '').replace(/["{}]/g, ' ').trim();
+        if (textExtract && textExtract.length < 100) {
+          parkingText = textExtract;
+        }
+      }
+    }
+
+    // 2. DOM / HTML Regex match for '주차' section in Information tab HTML
+    if (!parkingText) {
+      const parkingHtmlMatch = pageHtml.match(
+        /(?:주차|주차안내|주차정보|주차시설)[\s\S]{0,120}?(주차\s*가능\s*\(?[^<\n"\\]*\)?|주차\s*불가|무료\s*주차[^<\n"\\]*|유료\s*주차[^<\n"\\]*|발렛파킹[^<\n"\\]*|최초\s*\d+분\s*무료[^<\n"\\]*)/i
+      );
+      if (parkingHtmlMatch && parkingHtmlMatch[1]) {
+        parkingText = parkingHtmlMatch[1].trim();
+      }
+    }
+
+    // 3. Convenience facilities & keyword analysis fallback
+    const convenienceMatch =
       pageHtml.match(/"convenience"\s*:\s*\[([^\]]*)\]/)?.[1] ||
       pageHtml.match(/"options"\s*:\s*"([^"]+)"/)?.[1] ||
       pageHtml.match(/"facilityInfo"\s*:\s*\{([^}]*)\}/)?.[1] ||
       pageHtml;
 
-    const hasFreeParking = /무료주차|무료\s*주차/.test(optionsMatch);
-    const hasValetParking = /발렛파킹|발렛/.test(optionsMatch);
-    const hasPaidParking = /유료주차|유료\s*주차/.test(optionsMatch);
-    const hasGeneralParking = /"주차"|"주차가능"|"주차장"|주차\s*가능|주차장\s*완비|주차|발렛파킹/.test(optionsMatch);
-    const hasNoParkingExplicit = /"no_parking"|"주차불가"|"주차\s*불가"|"주차\s*없음"|주차\s*불가|주차장\s*없음/.test(optionsMatch);
+    const isExplicitNoParking =
+      /주차불가|주차\s*불가|주차\s*없음|주차장\s*없음|"no_parking"/.test(convenienceMatch) ||
+      /주차불가|주차\s*불가|주차장\s*없음/.test(parkingText);
 
-    let hasParking = false;
-    let parkingText = '주차 정보 없음';
+    const isFreeParking = /무료주차|무료\s*주차|최초\s*\d+분\s*무료|무료/.test(parkingText || convenienceMatch);
+    const isValetParking = /발렛파킹|발렛/.test(parkingText || convenienceMatch);
+    const isPaidParking = /유료주차|유료\s*주차|주차가능\s*\(유료\)|유료/.test(parkingText || convenienceMatch);
+    const isGeneralParking = /주차가능|주차\s*가능|주차장|주차/.test(parkingText || convenienceMatch);
 
-    if (hasNoParkingExplicit) {
+    if (isExplicitNoParking) {
       hasParking = false;
       parkingText = '주차 불가';
-    } else if (hasFreeParking) {
+    } else if (isFreeParking) {
       hasParking = true;
-      parkingText = '무료 주차 가능';
-    } else if (hasValetParking) {
+      parkingText = parkingText && parkingText.length < 30 ? parkingText : '무료 주차 가능';
+    } else if (isValetParking) {
       hasParking = true;
-      parkingText = '발렛파킹 가능';
-    } else if (hasPaidParking) {
+      parkingText = parkingText && parkingText.length < 30 ? parkingText : '발렛파킹 가능';
+    } else if (isPaidParking) {
       hasParking = true;
-      parkingText = '유료 주차 가능';
-    } else if (hasGeneralParking) {
+      parkingText = parkingText && parkingText.length < 30 ? parkingText : '주차가능 (유료)';
+    } else if (isGeneralParking) {
       hasParking = true;
-      parkingText = '주차 가능';
+      parkingText = parkingText && parkingText.length < 30 ? parkingText : '주차 가능';
     } else {
       hasParking = false;
       parkingText = '주차 정보 없음';

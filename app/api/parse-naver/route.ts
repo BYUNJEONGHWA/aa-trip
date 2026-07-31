@@ -161,65 +161,58 @@ async function parseSinglePlaceBySid(sid: string): Promise<Place | null> {
     let parkingText = '';
     let hasParking = false;
 
-    // 1. Direct JSON matching for parking properties in Information tab HTML
-    const parkingJsonMatch =
-      pageHtml.match(/"parking"\s*:\s*\{([^}]*)\}/) ||
-      pageHtml.match(/"parkingInfo"\s*:\s*"([^"]+)"/) ||
-      pageHtml.match(/"parkingText"\s*:\s*"([^"]+)"/) ||
-      pageHtml.match(/"parkingFee"\s*:\s*"([^"]+)"/) ||
-      pageHtml.match(/"parkingType"\s*:\s*"([^"]+)"/);
+    // 1. Slice specific '주차' section block from Information tab HTML
+    const parkingSectionMatch =
+      pageHtml.match(/<div[^>]*class="[^"]*place_section_header_title[^"]*"[^>]*>주차<\/div>[\s\S]*?(?=<div[^>]*class="[^"]*place_section_header_title[^"]*"|$)/i) ||
+      pageHtml.match(/>주차<\/h[1-6]>[\s\S]*?(?=<h[1-6]|$)/i);
 
-    if (parkingJsonMatch && parkingJsonMatch[1]) {
-      const rawJsonVal = parkingJsonMatch[1];
-      if (rawJsonVal && !rawJsonVal.includes('{{')) {
-        const textExtract = rawJsonVal.replace(/"[^"]+"\s*:/g, '').replace(/["{}]/g, ' ').trim();
-        if (textExtract && textExtract.length < 100) {
-          parkingText = textExtract;
-        }
-      }
+    const parkingHtmlBlock = parkingSectionMatch ? parkingSectionMatch[0] : pageHtml;
+
+    // 2. Parse HTML sp5hi ("주차가능", "주차불가") and GQ9lx / place_blind ("유료", "무료") inside parking block
+    const sp5hiMatch = parkingHtmlBlock.match(
+      /<div[^>]*class="sp5hi"[^>]*>([^<]+)(?:<span[^>]*class="GQ9lx"[^>]*><span[^>]*class="place_blind"[^>]*>([^<]+)<\/span>)?/
+    );
+
+    // 3. Parse kldCn ("최초 60분 무료", "추가 요금 15분당 400원") inside parking block
+    const kldCnMatches = parkingHtmlBlock.match(/<div[^>]*class="kldCn"[^>]*>([^<]+)<\/div>/g);
+    let kldCnText = '';
+    if (kldCnMatches) {
+      kldCnText = kldCnMatches.map((m) => m.replace(/<[^>]+>/g, '').trim()).join(', ');
     }
 
-    // 2. DOM / HTML Regex match for '주차' section in Information tab HTML
-    if (!parkingText) {
-      const parkingHtmlMatch = pageHtml.match(
-        /(?:주차|주차안내|주차정보|주차시설)[\s\S]{0,120}?(주차\s*가능\s*\(?[^<\n"\\]*\)?|주차\s*불가|무료\s*주차[^<\n"\\]*|유료\s*주차[^<\n"\\]*|발렛파킹[^<\n"\\]*|최초\s*\d+분\s*무료[^<\n"\\]*)/i
-      );
-      if (parkingHtmlMatch && parkingHtmlMatch[1]) {
-        parkingText = parkingHtmlMatch[1].trim();
-      }
-    }
-
-    // 3. Convenience facilities & keyword analysis fallback
-    const convenienceMatch =
+    // 4. Conveniences JSON array (check "conveniences" and "convenience")
+    const conveniencesJson =
+      pageHtml.match(/"conveniences"\s*:\s*\[([^\]]*)\]/)?.[1] ||
       pageHtml.match(/"convenience"\s*:\s*\[([^\]]*)\]/)?.[1] ||
-      pageHtml.match(/"options"\s*:\s*"([^"]+)"/)?.[1] ||
-      pageHtml.match(/"facilityInfo"\s*:\s*\{([^}]*)\}/)?.[1] ||
-      pageHtml;
+      '';
 
-    const isExplicitNoParking =
-      /주차불가|주차\s*불가|주차\s*없음|주차장\s*없음|"no_parking"/.test(convenienceMatch) ||
-      /주차불가|주차\s*불가|주차장\s*없음/.test(parkingText);
+    const hasParkingInConveniences = /"주차"|"주차가능"|"발렛파킹"/.test(conveniencesJson);
+    const hasNoParkingInConveniences = /"주차불가"|"주차 없음"/.test(conveniencesJson);
 
-    const isFreeParking = /무료주차|무료\s*주차|최초\s*\d+분\s*무료|무료/.test(parkingText || convenienceMatch);
-    const isValetParking = /발렛파킹|발렛/.test(parkingText || convenienceMatch);
-    const isPaidParking = /유료주차|유료\s*주차|주차가능\s*\(유료\)|유료/.test(parkingText || convenienceMatch);
-    const isGeneralParking = /주차가능|주차\s*가능|주차장|주차/.test(parkingText || convenienceMatch);
+    let statusTitle = '';
+    if (sp5hiMatch) {
+      const mainTitle = sp5hiMatch[1].trim(); // e.g. "주차가능"
+      const feeSub = sp5hiMatch[2] ? sp5hiMatch[2].trim() : ''; // e.g. "유료" or "무료"
+      if (feeSub) {
+        statusTitle = `${mainTitle}(${feeSub})`;
+      } else {
+        statusTitle = mainTitle;
+      }
+    }
 
-    if (isExplicitNoParking) {
+    if (statusTitle) {
+      hasParking = !statusTitle.includes('불가');
+      if (kldCnText) {
+        parkingText = `${statusTitle} - ${kldCnText}`;
+      } else {
+        parkingText = statusTitle;
+      }
+    } else if (hasParkingInConveniences && !hasNoParkingInConveniences) {
+      hasParking = true;
+      parkingText = '주차 가능';
+    } else if (hasNoParkingInConveniences) {
       hasParking = false;
       parkingText = '주차 불가';
-    } else if (isFreeParking) {
-      hasParking = true;
-      parkingText = parkingText && parkingText.length < 30 ? parkingText : '무료 주차 가능';
-    } else if (isValetParking) {
-      hasParking = true;
-      parkingText = parkingText && parkingText.length < 30 ? parkingText : '발렛파킹 가능';
-    } else if (isPaidParking) {
-      hasParking = true;
-      parkingText = parkingText && parkingText.length < 30 ? parkingText : '주차가능 (유료)';
-    } else if (isGeneralParking) {
-      hasParking = true;
-      parkingText = parkingText && parkingText.length < 30 ? parkingText : '주차 가능';
     } else {
       hasParking = false;
       parkingText = '주차 정보 없음';

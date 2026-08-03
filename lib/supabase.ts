@@ -229,47 +229,71 @@ export async function fetchAllTripsFromSupabase() {
  */
 export async function fetchLatestTripFromSupabase(): Promise<SavedTripPayload | null> {
   if (!supabase) return null;
-  const { data: latestTrips, error } = await supabase
-    .from('trips')
-    .select('id')
-    .order('updated_at', { ascending: false })
-    .limit(1);
+  try {
+    const { data: latestTrips, error } = await supabase
+      .from('trips')
+      .select('id')
+      .order('updated_at', { ascending: false })
+      .limit(1);
 
-  if (error || !latestTrips || latestTrips.length === 0) return null;
-  return await loadTripFromSupabase(latestTrips[0].id);
+    if (error || !latestTrips || latestTrips.length === 0) return null;
+    return await loadTripFromSupabase(latestTrips[0].id);
+  } catch (e) {
+    console.warn('[Supabase] fetchLatestTripFromSupabase exception caught:', e);
+    return null;
+  }
 }
 
 /**
  * Subscribe to real-time database changes across devices for instant sync
  */
 export function subscribeToTripChanges(onRealtimeChange: () => void) {
-  if (!supabase) return () => {};
+  if (!supabase || typeof window === 'undefined') return () => {};
 
-  const channel = supabase
-    .channel('aa-trip-realtime-channel')
-    .on(
-      'postgres_changes',
-      { event: '*', schema: 'public', table: 'trips' },
-      () => onRealtimeChange()
-    )
-    .on(
-      'postgres_changes',
-      { event: '*', schema: 'public', table: 'places' },
-      () => onRealtimeChange()
-    )
-    .on(
-      'postgres_changes',
-      { event: '*', schema: 'public', table: 'scheduled_places' },
-      () => onRealtimeChange()
-    )
-    .on(
-      'postgres_changes',
-      { event: '*', schema: 'public', table: 'day_itineraries' },
-      () => onRealtimeChange()
-    )
-    .subscribe();
+  try {
+    const channel = supabase
+      .channel('aa-trip-realtime-channel')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'trips' },
+        () => {
+          try { onRealtimeChange(); } catch (err) { console.warn('Realtime callback err:', err); }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'places' },
+        () => {
+          try { onRealtimeChange(); } catch (err) { console.warn('Realtime callback err:', err); }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'scheduled_places' },
+        () => {
+          try { onRealtimeChange(); } catch (err) { console.warn('Realtime callback err:', err); }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'day_itineraries' },
+        () => {
+          try { onRealtimeChange(); } catch (err) { console.warn('Realtime callback err:', err); }
+        }
+      )
+      .subscribe();
 
-  return () => {
-    supabase.removeChannel(channel);
-  };
+    return () => {
+      try {
+        if (supabase && channel) {
+          supabase.removeChannel(channel);
+        }
+      } catch (err) {
+        console.warn('Realtime unsubscribe err:', err);
+      }
+    };
+  } catch (err) {
+    console.warn('[Supabase Realtime] Setup failed:', err);
+    return () => {};
+  }
 }

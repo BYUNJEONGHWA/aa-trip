@@ -23,6 +23,8 @@ export default function TripFolderTabs() {
     dayItineraries,
     startDate,
     dayCount,
+    isDbInitialLoaded,
+    setIsDbInitialLoaded,
     loadFullTripState,
   } = useAppStore();
 
@@ -34,7 +36,7 @@ export default function TripFolderTabs() {
   const [editingTripId, setEditingTripId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
 
-  const [autoSaveStatus, setAutoSaveStatus] = useState<'saved' | 'saving' | 'idle'>('saved');
+  const [autoSaveStatus, setAutoSaveStatus] = useState<'saved' | 'saving' | 'idle' | 'error'>('saved');
 
   // Fetch all trips from Supabase DB on mount or when activeTripId changes
   const loadTripsList = async () => {
@@ -75,9 +77,9 @@ export default function TripFolderTabs() {
     };
   }, [activeTripId]);
 
-  // Debounced Real-time Auto-Save to Supabase DB (Guards removed for 0-place trips)
+  // Debounced Real-time Auto-Save to Supabase DB (Guards for race condition prevention)
   useEffect(() => {
-    if (!isSupabaseConfigured()) return;
+    if (!isSupabaseConfigured() || !isDbInitialLoaded) return;
 
     setAutoSaveStatus('saving');
     const timer = setTimeout(async () => {
@@ -93,14 +95,14 @@ export default function TripFolderTabs() {
         });
         setAutoSaveStatus('saved');
         loadTripsList();
-      } catch (e) {
-        console.warn('Auto save error:', e);
-        setAutoSaveStatus('idle');
+      } catch (e: any) {
+        console.error('❌ [Auto Save Error]:', e);
+        setAutoSaveStatus('error');
       }
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [places, scheduledPlaces, dayItineraries, startDate, dayCount, activeTripId, activeTripTitle]);
+  }, [places, scheduledPlaces, dayItineraries, startDate, dayCount, activeTripId, activeTripTitle, isDbInitialLoaded]);
 
   // Switch Active Trip Folder with isolated places/schedules
   const handleSelectTrip = async (trip: any) => {
@@ -361,6 +363,11 @@ export default function TripFolderTabs() {
           <span className="flex items-center gap-1 text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
             <RefreshCw className="w-3 h-3 animate-spin" />
             <span>DB 저장 중...</span>
+          </span>
+        ) : autoSaveStatus === 'error' ? (
+          <span className="flex items-center gap-1 text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200 animate-pulse">
+            <X className="w-3 h-3 text-rose-600" />
+            <span>❌ DB 저장 실패</span>
           </span>
         ) : (
           <span className="flex items-center gap-1 text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">

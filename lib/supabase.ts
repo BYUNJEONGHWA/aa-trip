@@ -88,7 +88,10 @@ export async function saveTripToSupabase(payload: SavedTripPayload) {
     }));
 
     const { error: placesError } = await supabase.from('places').upsert(placesData, { onConflict: 'id' });
-    if (placesError) console.warn('Places upsert warn:', placesError.message);
+    if (placesError) {
+      console.error('❌ [DB 장소 저장 실패]:', placesError.message);
+      throw placesError;
+    }
   }
 
   // 3. Delete existing schedules for this trip & insert new schedules
@@ -104,7 +107,10 @@ export async function saveTripToSupabase(payload: SavedTripPayload) {
     }));
 
     const { error: schedError } = await supabase.from('scheduled_places').insert(scheduledData);
-    if (schedError) throw schedError;
+    if (schedError) {
+      console.error('❌ [DB 일정 저장 실패]:', schedError.message);
+      throw schedError;
+    }
   }
 
   // 4. Save Day Notes
@@ -116,9 +122,14 @@ export async function saveTripToSupabase(payload: SavedTripPayload) {
       date_str: it.dateStr,
       notes: it.notes || '',
     }));
-    await supabase.from('day_itineraries').insert(notesData);
+    const { error: notesErr } = await supabase.from('day_itineraries').insert(notesData);
+    if (notesErr) {
+      console.error('❌ [DB 메모 저장 실패]:', notesErr.message);
+      throw notesErr;
+    }
   }
 
+  console.log('💾 [DB 저장 성공]:', { tripId, title, placeCount: places.length, schedCount: scheduledPlaces.length });
   return { success: true, tripId };
 }
 
@@ -200,7 +211,7 @@ export async function loadTripFromSupabase(tripId: string): Promise<SavedTripPay
     });
   }
 
-  return {
+  const resultPayload = {
     tripId: trip.id,
     title: trip.title || '여행 일정',
     startDate: trip.start_date,
@@ -209,6 +220,15 @@ export async function loadTripFromSupabase(tripId: string): Promise<SavedTripPay
     scheduledPlaces,
     dayItineraries,
   };
+
+  console.log('📥 [DB 불러오기 성공]:', {
+    tripId: trip.id,
+    title: trip.title,
+    placeCount: places.length,
+    schedCount: scheduledPlaces.length,
+  });
+
+  return resultPayload;
 }
 
 /**

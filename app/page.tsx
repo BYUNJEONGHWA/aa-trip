@@ -45,6 +45,8 @@ export default function Home() {
     places,
     addPlaces,
     activeDayIndex,
+    isDbInitialLoaded,
+    setIsDbInitialLoaded,
     loadFullTripState,
   } = useAppStore();
 
@@ -57,7 +59,11 @@ export default function Home() {
     let isMounted = true;
 
     async function autoLoadFromSupabase() {
-      if (!isMounted || !isSupabaseConfigured()) return;
+      if (!isMounted) return;
+      if (!isSupabaseConfigured()) {
+        if (isMounted) setIsDbInitialLoaded(true);
+        return;
+      }
       try {
         // Always load the most recently updated trip across devices
         const loaded = await fetchLatestTripFromSupabase();
@@ -75,6 +81,10 @@ export default function Home() {
         }
       } catch (e) {
         console.warn('Auto load from Supabase failed:', e);
+      } finally {
+        if (isMounted) {
+          setIsDbInitialLoaded(true);
+        }
       }
     }
 

@@ -38,6 +38,8 @@ interface AppState {
   isSupabaseModalOpen: boolean;
 
   // Actions
+  isDbInitialLoaded: boolean;
+  setIsDbInitialLoaded: (loaded: boolean) => void;
   setActiveTrip: (tripId: string, title: string) => void;
   setFilterDayOff: (filter: DayOffFilter) => void;
   setFilterParkingOnly: (val: boolean) => void;
@@ -128,6 +130,8 @@ export const useAppStore = create<AppState>()(
         isSearchModalOpen: false,
         isSupabaseModalOpen: false,
 
+        isDbInitialLoaded: false,
+        setIsDbInitialLoaded: (loaded) => set({ isDbInitialLoaded: loaded }),
         setActiveTrip: (tripId, title) => set({ activeTripId: tripId, activeTripTitle: title }),
         setFilterDayOff: (filter) => set({ filterDayOff: filter }),
         setFilterParkingOnly: (val) => set({ filterParkingOnly: val }),

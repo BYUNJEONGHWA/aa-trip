@@ -86,3 +86,28 @@ export const getDayColorTheme = (dayIndex: number): DayColorTheme => {
 };
 
 export const INITIAL_PLACES: Place[] = [];
+
+/**
+ * Single Source of Truth for Naver Map SDK Client ID resolution
+ */
+export const getNaverMapClientId = (): string => {
+  const envKey = process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID || process.env.NEXT_PUBLIC_NAVER_CLIENT_ID;
+  const cleanEnv = (envKey || '').trim();
+  if (cleanEnv) return cleanEnv;
+
+  if (typeof window !== 'undefined') {
+    const stored = (localStorage.getItem('NAVER_MAP_CLIENT_ID') || '').trim();
+    if (stored) return stored;
+  }
+
+  return 'scqr0strs4'; // Verified Default Client ID
+};
+
+/**
+ * Permanently Fixed Naver Map Script URL Generator
+ * Official Specification: ncpKeyId & submodules=geocoder
+ */
+export const getNaverMapScriptUrl = (clientId?: string): string => {
+  const key = clientId || getNaverMapClientId();
+  return `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${key}&submodules=geocoder`;
+};

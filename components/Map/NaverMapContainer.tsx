@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useAppStore } from '@/lib/store';
-import { getDayColorTheme } from '@/lib/constants';
+import { getDayColorTheme, getNaverMapClientId, getNaverMapScriptUrl } from '@/lib/constants';
 import { Place, ScheduledPlace } from '@/lib/types';
 import { calculateDistanceKm, estimateTravelTimeMinutes, isPlaceClosedOnDate, getKoreanDayOfWeek } from '@/lib/routeOptimizer';
 import { Navigation, AlertTriangle, Maximize2, Minimize2, ChevronLeft, ChevronRight, Layers, MapPin, Sparkles, Calendar, RotateCcw, RefreshCw, Key, Plus, X } from 'lucide-react';
@@ -255,14 +255,9 @@ export default function NaverMapContainer({
     }
 
     // 1. Environmental Variable check & Fallback logging
-    const envKey = process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID || process.env.NEXT_PUBLIC_NAVER_CLIENT_ID;
-    let cleanClientId = (envKey || '').trim();
-
-    if (!cleanClientId) {
-      console.error('[Naver Map SDK] Client ID environmental variable is missing! (NEXT_PUBLIC_NAVER_MAP_CLIENT_ID or NEXT_PUBLIC_NAVER_CLIENT_ID)');
-      const storedKey = (localStorage.getItem('NAVER_MAP_CLIENT_ID') || '').trim();
-      cleanClientId = storedKey || 'scqr0strs4';
-      setMapStatus('ncpClientId 없음 (fallback 사용)');
+    const cleanClientId = getNaverMapClientId();
+    if (!process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID && !process.env.NEXT_PUBLIC_NAVER_CLIENT_ID) {
+      console.error('[Naver Map SDK] Environmental variable missing! Fallback applied.');
     }
 
     // 3. 200ms Polling interval for window.naver.maps
@@ -303,11 +298,11 @@ export default function NaverMapContainer({
       return () => clearInterval(pollInterval);
     }
 
-    // Inject Script into DOM (Strictly using ncpClientId)
+    // Inject Script into DOM (Strictly using single source of truth helper with ncpKeyId)
     const script = document.createElement('script');
     script.id = 'naver-map-script';
     script.type = 'text/javascript';
-    script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${cleanClientId}&submodules=geocoder`;
+    script.src = getNaverMapScriptUrl(cleanClientId);
     script.async = true;
 
     script.onload = () => {

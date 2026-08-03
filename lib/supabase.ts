@@ -223,3 +223,53 @@ export async function fetchAllTripsFromSupabase() {
   }
   return data || [];
 }
+
+/**
+ * Fetch the single most recently updated trip state from Supabase
+ */
+export async function fetchLatestTripFromSupabase(): Promise<SavedTripPayload | null> {
+  if (!supabase) return null;
+  const { data: latestTrips, error } = await supabase
+    .from('trips')
+    .select('id')
+    .order('updated_at', { ascending: false })
+    .limit(1);
+
+  if (error || !latestTrips || latestTrips.length === 0) return null;
+  return await loadTripFromSupabase(latestTrips[0].id);
+}
+
+/**
+ * Subscribe to real-time database changes across devices for instant sync
+ */
+export function subscribeToTripChanges(onRealtimeChange: () => void) {
+  if (!supabase) return () => {};
+
+  const channel = supabase
+    .channel('aa-trip-realtime-channel')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'trips' },
+      () => onRealtimeChange()
+    )
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'places' },
+      () => onRealtimeChange()
+    )
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'scheduled_places' },
+      () => onRealtimeChange()
+    )
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'day_itineraries' },
+      () => onRealtimeChange()
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}

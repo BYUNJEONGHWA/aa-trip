@@ -7,6 +7,7 @@ import {
   loadTripFromSupabase,
   saveTripToSupabase,
   updateTripTitleInSupabase,
+  subscribeToTripChanges,
   isSupabaseConfigured,
   supabase,
 } from '@/lib/supabase';
@@ -48,6 +49,17 @@ export default function TripFolderTabs() {
 
   useEffect(() => {
     loadTripsList();
+
+    let unsubscribe = () => {};
+    if (isSupabaseConfigured()) {
+      unsubscribe = subscribeToTripChanges(() => {
+        loadTripsList();
+      });
+    }
+
+    return () => {
+      unsubscribe();
+    };
   }, [activeTripId]);
 
   // Debounced Real-time Auto-Save to Supabase DB (Guards removed for 0-place trips)

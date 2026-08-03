@@ -13,7 +13,13 @@ import SupabaseSyncModal from '@/components/Modals/SupabaseSyncModal';
 import PlaceCard from '@/components/PlaceCard';
 import ScheduledCard from '@/components/Scheduler/ScheduledCard';
 import { useAppStore } from '@/lib/store';
-import { isSupabaseConfigured, fetchAllTripsFromSupabase, loadTripFromSupabase } from '@/lib/supabase';
+import {
+  isSupabaseConfigured,
+  fetchAllTripsFromSupabase,
+  loadTripFromSupabase,
+  fetchLatestTripFromSupabase,
+  subscribeToTripChanges,
+} from '@/lib/supabase';
 import {
   DndContext,
   DragOverlay,
@@ -46,34 +52,44 @@ export default function Home() {
   const [mapViewState, setMapViewState] = useState<'NORMAL' | 'MINIMIZED' | 'MAXIMIZED'>('NORMAL');
   const [mobileActiveView, setMobileActiveView] = useState<'PLACES' | 'SCHEDULER' | 'MAP'>('SCHEDULER');
 
-  // Auto-sync / load latest real places from Supabase on mount
+  // Auto-sync / load latest real trip and places from Supabase on mount
   useEffect(() => {
     async function autoLoadFromSupabase() {
       if (isSupabaseConfigured()) {
         try {
-          const currentTripId = activeTripId || 'aa_trip_main';
-          const loaded = await loadTripFromSupabase(currentTripId);
+          // Always load the most recently updated trip across devices
+          const loaded = await fetchLatestTripFromSupabase();
           if (loaded) {
-            const targetTitle = loaded.title || activeTripTitle;
-            setActiveTrip(loaded.tripId, targetTitle);
-            if (loaded.places && loaded.places.length > 0) {
-              loadFullTripState({
-                tripId: loaded.tripId,
-                title: targetTitle,
-                startDate: loaded.startDate || '2026-08-16',
-                dayCount: loaded.dayCount || 3,
-                places: loaded.places,
-                scheduledPlaces: loaded.scheduledPlaces || [],
-                dayItineraries: loaded.dayItineraries || [],
-              });
-            }
+            setActiveTrip(loaded.tripId, loaded.title);
+            loadFullTripState({
+              tripId: loaded.tripId,
+              title: loaded.title,
+              startDate: loaded.startDate || '2026-08-16',
+              dayCount: loaded.dayCount || 3,
+              places: loaded.places || [],
+              scheduledPlaces: loaded.scheduledPlaces || [],
+              dayItineraries: loaded.dayItineraries || [],
+            });
           }
         } catch (e) {
           console.warn('Auto load from Supabase failed:', e);
         }
       }
     }
+
     autoLoadFromSupabase();
+
+    // Subscribe to Supabase Realtime changes across devices
+    let unsubscribe = () => {};
+    if (isSupabaseConfigured()) {
+      unsubscribe = subscribeToTripChanges(() => {
+        autoLoadFromSupabase();
+      });
+    }
+
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   // Seamless automatic background update of place operating hours

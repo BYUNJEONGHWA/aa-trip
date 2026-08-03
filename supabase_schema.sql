@@ -71,3 +71,9 @@ CREATE POLICY "Allow public all access on day_itineraries" ON public.day_itinera
 CREATE INDEX IF NOT EXISTS idx_places_trip_id ON public.places(trip_id);
 CREATE INDEX IF NOT EXISTS idx_scheduled_places_trip_id ON public.scheduled_places(trip_id);
 CREATE INDEX IF NOT EXISTS idx_day_itineraries_trip_id ON public.day_itineraries(trip_id);
+
+-- 7. Enable Supabase Realtime for instant multi-device syncing
+ALTER PUBLICATION supabase_realtime ADD TABLE public.trips;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.places;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.scheduled_places;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.day_itineraries;

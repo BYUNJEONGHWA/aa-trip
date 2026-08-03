@@ -345,22 +345,14 @@ export const useAppStore = create<AppState>()(
         setIsSupabaseModalOpen: (open) => set({ isSupabaseModalOpen: open }),
 
         loadFullTripState: ({ tripId, title, startDate, dayCount, places, scheduledPlaces, dayItineraries }) => {
-          const state = get();
           const notesMap: Record<number, string> = {};
 
-          // 1. Preserve notes passed from payload (e.g. Supabase DB)
+          // 1. Preserve notes passed from payload (e.g. Supabase DB for this specific trip)
           if (dayItineraries && dayItineraries.length > 0) {
             dayItineraries.forEach((it) => {
               notesMap[it.dayIndex] = it.notes || '';
             });
           }
-
-          // 2. Fall back to existing state/localStorage notes if payload notes were empty
-          state.dayItineraries.forEach((it) => {
-            if (notesMap[it.dayIndex] === undefined || notesMap[it.dayIndex] === '') {
-              if (it.notes) notesMap[it.dayIndex] = it.notes;
-            }
-          });
 
           const newItineraries = buildDayItineraries(startDate, dayCount, notesMap);
           set({

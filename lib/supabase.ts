@@ -132,11 +132,8 @@ export async function loadTripFromSupabase(tripId: string): Promise<SavedTripPay
   const { data: trip, error: tripErr } = await supabase.from('trips').select('*').eq('id', tripId).single();
   if (tripErr || !trip) return null;
 
-  // 2. Fetch Places for THIS SPECIFIC TRIP (including legacy un-scoped places)
-  const { data: placesData } = await supabase
-    .from('places')
-    .select('*')
-    .or(`trip_id.eq.${tripId},trip_id.is.null`);
+  // 2. Fetch Places for THIS SPECIFIC TRIP
+  const { data: placesData } = await supabase.from('places').select('*').eq('trip_id', tripId);
   const places: Place[] = (placesData || []).map((p: any) => ({
     id: p.id,
     name: p.name,

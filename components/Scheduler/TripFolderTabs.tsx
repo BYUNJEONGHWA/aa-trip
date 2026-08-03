@@ -97,7 +97,7 @@ export default function TripFolderTabs() {
         console.warn('Auto save error:', e);
         setAutoSaveStatus('idle');
       }
-    }, 1200);
+    }, 300);
 
     return () => clearTimeout(timer);
   }, [places, scheduledPlaces, dayItineraries, startDate, dayCount, activeTripId, activeTripTitle]);

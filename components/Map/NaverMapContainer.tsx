@@ -698,33 +698,41 @@ export default function NaverMapContainer({
           <span>[상태: {mapStatus}]</span>
         </div>
         {isAuthFailed ? (
-          <div className="absolute inset-0 z-30 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center text-white space-y-4">
+          <div className="absolute inset-0 z-30 bg-slate-950/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center text-white space-y-4">
             <div className="w-12 h-12 rounded-full bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400 shadow-lg animate-bounce">
               <AlertTriangle className="w-6 h-6" />
             </div>
             <div className="space-y-1">
-              <h4 className="text-base font-extrabold text-rose-400">네이버 지도 인증 실패 (OpenAPI 3.0)</h4>
+              <h4 className="text-base font-extrabold text-rose-400">네이버 지도 API 인증 실패 (403 Forbidden)</h4>
               <p className="text-xs text-slate-300 max-w-sm">
-                네이버 클라우드 콘솔에 현재 접속 주소가 등록되어 있지 않거나 Client ID가 일치하지 않습니다.
+                네이버 클라우드 콘솔에 현재 웹사이트 도메인이 등록되어 있지 않거나 Client ID가 다릅니다.
               </p>
             </div>
 
-            <div className="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl max-w-sm w-full text-left text-xs space-y-2 shadow-2xl">
-              <div className="flex items-center justify-between text-slate-400 font-bold text-[11px]">
-                <span>현재 접속 URL</span>
-                <span className="font-mono text-emerald-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">{authDomain}</span>
+            <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl max-w-sm w-full text-left text-xs space-y-2.5 shadow-2xl">
+              <div className="flex items-center justify-between text-slate-300 font-bold text-[11px] pb-1 border-b border-slate-800">
+                <span>현재 시도 Client ID</span>
+                <span className="font-mono text-amber-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-800 font-bold">
+                  {getNaverMapClientId()}
+                </span>
               </div>
-              <p className="text-[11px] text-slate-400 leading-relaxed">
-                👉 <strong>해결 방법:</strong> 네이버 클라우드 콘솔 (<a href="https://console.ncloud.com" target="_blank" rel="noreferrer" className="text-emerald-400 underline font-bold">console.ncloud.com</a>) ➔ AI·NAVER API ➔ Application ➔ <strong>Web 서비스 URL</strong>에 <code className="text-emerald-300 font-bold">https://{authDomain}</code> 주소를 추가 등록하세요.
-              </p>
+              <div className="flex items-center justify-between text-slate-300 font-bold text-[11px]">
+                <span>현재 접속 도메인</span>
+                <span className="font-mono text-emerald-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-800 font-bold">
+                  {authDomain || 'aa-trip.vercel.app'}
+                </span>
+              </div>
+              <div className="text-[11px] text-slate-400 leading-relaxed pt-1 border-t border-slate-800">
+                👉 <strong>해결 방법:</strong> 네이버 클라우드 콘솔 (<a href="https://console.ncloud.com" target="_blank" rel="noreferrer" className="text-emerald-400 underline font-bold">console.ncloud.com</a>) ➔ AI·NAVER API ➔ Application ➔ Web 서비스 URL에 <code className="text-emerald-300 font-bold">https://{authDomain || 'aa-trip.vercel.app'}</code> 주소를 추가하세요.
+              </div>
             </div>
 
             <button
               onClick={() => setIsKeyModalOpen(true)}
-              className="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black transition-all shadow-lg flex items-center gap-1.5 cursor-pointer"
+              className="px-5 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black transition-all shadow-lg flex items-center gap-2 cursor-pointer hover:scale-105"
             >
               <Key className="w-4 h-4" />
-              <span>네이버 Client ID 변경하기</span>
+              <span>다른 네이버 Client ID 입력하기</span>
             </button>
           </div>
         ) : !isLoaded ? (

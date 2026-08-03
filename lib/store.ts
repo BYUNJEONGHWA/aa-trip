@@ -203,16 +203,31 @@ export const useAppStore = create<AppState>()(
           set((state) => {
             const placeMap = new Map<string, Place>();
             // Add existing places indexed by ID
-            state.places.forEach((p) => placeMap.set(p.id, p));
+            (state.places || []).forEach((p) => {
+              if (p && p.id) placeMap.set(p.id, p);
+            });
+
+            // Safe number parser helper to prevent "toFixed is not a function" TypeError
+            const parseNum = (val: any): number => {
+              const num = typeof val === 'number' ? val : parseFloat(String(val || 0));
+              return isNaN(num) ? 0 : num;
+            };
 
             // Helper for 2nd layer location signature (name + lat + lng)
-            const getSignature = (p: Place) => `${(p.name || '').trim()}_${(p.lat || 0).toFixed(4)}_${(p.lng || 0).toFixed(4)}`;
+            const getSignature = (p: Place) => {
+              const latNum = parseNum(p?.lat);
+              const lngNum = parseNum(p?.lng);
+              return `${(p?.name || '').trim()}_${latNum.toFixed(4)}_${lngNum.toFixed(4)}`;
+            };
 
             // Build signature lookup
             const signatureMap = new Map<string, string>();
-            state.places.forEach((p) => signatureMap.set(getSignature(p), p.id));
+            (state.places || []).forEach((p) => {
+              if (p) signatureMap.set(getSignature(p), p.id);
+            });
 
-            newPlaces.forEach((p) => {
+            (newPlaces || []).forEach((p) => {
+              if (!p || !p.id) return;
               const sig = getSignature(p);
               const matchedExistingId = signatureMap.get(sig);
               const targetId = matchedExistingId || p.id;

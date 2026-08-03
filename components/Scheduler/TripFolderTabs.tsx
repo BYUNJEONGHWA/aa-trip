@@ -58,7 +58,9 @@ export default function TripFolderTabs() {
     }
 
     return () => {
-      unsubscribe();
+      if (typeof unsubscribe === 'function') {
+        unsubscribe();
+      }
     };
   }, [activeTripId]);
 

@@ -202,13 +202,28 @@ export const useAppStore = create<AppState>()(
         addPlaces: (newPlaces) =>
           set((state) => {
             const placeMap = new Map<string, Place>();
-            // Add existing places
+            // Add existing places indexed by ID
             state.places.forEach((p) => placeMap.set(p.id, p));
-            // Overwrite/update with new places
+
+            // Helper for 2nd layer location signature (name + lat + lng)
+            const getSignature = (p: Place) => `${(p.name || '').trim()}_${(p.lat || 0).toFixed(4)}_${(p.lng || 0).toFixed(4)}`;
+
+            // Build signature lookup
+            const signatureMap = new Map<string, string>();
+            state.places.forEach((p) => signatureMap.set(getSignature(p), p.id));
+
             newPlaces.forEach((p) => {
-              const existing = placeMap.get(p.id);
-              placeMap.set(p.id, existing ? { ...existing, ...p } : p);
+              const sig = getSignature(p);
+              const matchedExistingId = signatureMap.get(sig);
+              const targetId = matchedExistingId || p.id;
+
+              const existing = placeMap.get(targetId);
+              const mergedPlace = existing ? { ...existing, ...p, id: targetId } : { ...p, id: targetId };
+
+              placeMap.set(targetId, mergedPlace);
+              signatureMap.set(sig, targetId);
             });
+
             return {
               places: Array.from(placeMap.values()),
             };

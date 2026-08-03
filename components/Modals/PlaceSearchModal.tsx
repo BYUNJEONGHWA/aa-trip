@@ -64,13 +64,13 @@ export default function PlaceSearchModal() {
   };
 
   const handleAddPlace = async (item: SearchResultItem) => {
-    const isAlreadyAdded = places.some((p) => p.id === item.id);
+    const normalizedId = item.id.startsWith('naver_place_') ? item.id : `naver_place_${item.id}`;
 
     const categoryOrAddr = `${item.category} ${item.roadAddress} ${item.address} ${item.place_name}`;
     const hasParkingInitial = /주차|발렛|주차장/.test(categoryOrAddr) && !/주차불가|주차\s*없음/.test(categoryOrAddr);
 
     const newPlace: Place = {
-      id: item.id,
+      id: normalizedId,
       name: item.place_name || item.name,
       category: item.category || '장소',
       address: item.roadAddress || item.address || '',
@@ -90,10 +90,10 @@ export default function PlaceSearchModal() {
     addPlaces([newPlace]);
 
     // Track added state
-    setAddedIds((prev) => new Set(prev).add(item.id));
+    setAddedIds((prev) => new Set(prev).add(normalizedId).add(item.id));
 
     // Focus & Center Naver Map camera directly to new place location
-    setSelectedPlaceId(item.id);
+    setSelectedPlaceId(normalizedId);
     setFocusPlaceLocation({
       lat: newPlace.lat,
       lng: newPlace.lng,
@@ -101,12 +101,14 @@ export default function PlaceSearchModal() {
     });
 
     // Background parse real business hours and day-offs if SID is numeric
-    if (/^\d+$/.test(item.id)) {
+    const cleanSid = item.id.replace(/^[^\d]+/, '').replace(/_\d+$/, '');
+    if (/^\d+$/.test(cleanSid)) {
       try {
-        const parseRes = await fetch(`/api/parse-naver?sid=${item.id}`);
+        const parseRes = await fetch(`/api/parse-naver?sid=${cleanSid}`);
         const parseData = await parseRes.json();
         if (parseData.success && parseData.place) {
-          addPlaces([parseData.place]);
+          // Ensure place ID is normalized
+          addPlaces([{ ...parseData.place, id: normalizedId }]);
         }
       } catch (err) {
         console.warn('Background parse failed:', err);
@@ -196,7 +198,8 @@ export default function PlaceSearchModal() {
             </div>
           ) : (
             results.map((item) => {
-              const isAdded = addedIds.has(item.id) || places.some((p) => p.id === item.id);
+              const normId = item.id.startsWith('naver_place_') ? item.id : `naver_place_${item.id}`;
+              const isAdded = addedIds.has(item.id) || addedIds.has(normId) || places.some((p) => p.id === item.id || p.id === normId);
               return (
                 <div
                   key={item.id}

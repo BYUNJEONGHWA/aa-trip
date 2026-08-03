@@ -83,16 +83,33 @@ export default function NaverMapContainer({
   const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
   const [mobileAddModalPlace, setMobileAddModalPlace] = useState<Place | null>(null);
 
+  // 4. Status Indicator State for Live Mobile Debugging
+  const [mapStatus, setMapStatus] = useState<string>('스크립트 로딩중');
+
+  // 2. Safe Coordinate Validator & Converter (LatLng Number Check)
+  const getSafeLatLng = useCallback((latCandidate: any, lngCandidate: any) => {
+    let lat = typeof latCandidate === 'number' ? latCandidate : parseFloat(String(latCandidate));
+    let lng = typeof lngCandidate === 'number' ? lngCandidate : parseFloat(String(lngCandidate));
+
+    if (isNaN(lat) || isNaN(lng) || !lat || !lng) {
+      console.warn('[Naver Maps] Invalid coordinate parameter. Fallback to Seoul City Hall (37.5665, 126.9780)');
+      return { lat: 37.5665, lng: 126.9780, isFallback: true };
+    }
+    return { lat, lng, isFallback: false };
+  }, []);
+
   // Listen for Naver Map API authentication failure event
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
     if (window.__NAVER_MAP_AUTH_FAILED__) {
       setIsAuthFailed(true);
+      setMapStatus('인증 실패 (OpenAPI3.0 403)');
     }
 
     const handleAuthFailed = () => {
       setIsAuthFailed(true);
+      setMapStatus('인증 실패 (OpenAPI3.0 403)');
     };
 
     window.addEventListener('naver_map_auth_failed', handleAuthFailed);
@@ -110,8 +127,6 @@ export default function NaverMapContainer({
     if (!effectiveDateStr) return 0;
     return places.filter((p) => isPlaceClosedOnDate(p, effectiveDateStr)).length;
   }, [places, effectiveDateStr]);
-
-  const clientId = (process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID || '').trim();
 
   // Create Place Map for quick O(1) lookup
   const placeMap = React.useMemo(() => {
@@ -159,8 +174,9 @@ export default function NaverMapContainer({
     let hasValidPoints = false;
 
     places.forEach((p) => {
-      if (p.lat && p.lng) {
-        bounds.extend(new window.naver.maps.LatLng(p.lat, p.lng));
+      const safe = getSafeLatLng(p.lat, p.lng);
+      if (!safe.isFallback) {
+        bounds.extend(new window.naver.maps.LatLng(safe.lat, safe.lng));
         hasValidPoints = true;
       }
     });
@@ -170,7 +186,7 @@ export default function NaverMapContainer({
         maxZoom: 15,
       });
     }
-  }, [places]);
+  }, [places, getSafeLatLng]);
 
   const [authDomain, setAuthDomain] = useState<string | null>(null);
 
@@ -193,7 +209,12 @@ export default function NaverMapContainer({
     if (width === 0 && height === 0 && !isMobileVisible) return;
 
     if (!naverMapInstance.current) {
-      const defaultCenter = new window.naver.maps.LatLng(35.15, 126.90);
+      const safeCenter = getSafeLatLng(35.15, 126.90);
+      if (safeCenter.isFallback) {
+        setMapStatus('좌표 오류 (기본 좌표 적용)');
+      }
+
+      const defaultCenter = new window.naver.maps.LatLng(safeCenter.lat, safeCenter.lng);
       const mapOptions = {
         center: defaultCenter,
         zoom: 12,
@@ -207,58 +228,100 @@ export default function NaverMapContainer({
       const map = new window.naver.maps.Map(mapRef.current, mapOptions);
       naverMapInstance.current = map;
       setIsLoaded(true);
+      setMapStatus('지도 로드 완료');
 
-      // Immediate mobile resize recalculation
+      // 3. Immediate & 200ms delayed resize trigger for mobile responsiveness
       window.dispatchEvent(new Event('resize'));
       setTimeout(() => {
-        window.dispatchEvent(new Event('resize'));
+        if (map && window.naver?.maps?.Event) {
+          window.naver.maps.Event.trigger(map, 'resize');
+        }
         if (map.setSize && mapRef.current) {
           const w = mapRef.current.clientWidth || 360;
           const h = mapRef.current.clientHeight || 400;
           map.setSize(new window.naver.maps.Size(w, h));
         }
-      }, 150);
+      }, 200);
     }
-  }, [isMobileVisible]);
+  }, [isMobileVisible, getSafeLatLng]);
 
+  // 1 & 3. Polling Mechanism (200ms x 15 attempts) & Strict ncpClientId Verification
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
     if (window.__NAVER_MAP_AUTH_FAILED__) {
       setIsAuthFailed(true);
+      setMapStatus('인증 실패 (OpenAPI3.0 403)');
     }
 
-    const envKey = (process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID || '').trim();
-    const storedKey = (localStorage.getItem('NAVER_MAP_CLIENT_ID') || '').trim();
-    
-    // Priority: Valid Env key > Valid Stored Key > Default Client ID
-    const clientId = envKey || storedKey || 'scqr0strs4';
+    // 1. Environmental Variable check & Fallback logging
+    const envKey = process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID || process.env.NEXT_PUBLIC_NAVER_CLIENT_ID;
+    let cleanClientId = (envKey || '').trim();
 
-    // 1. If window.naver.maps already exists
+    if (!cleanClientId) {
+      console.error('[Naver Map SDK] Client ID environmental variable is missing! (NEXT_PUBLIC_NAVER_MAP_CLIENT_ID or NEXT_PUBLIC_NAVER_CLIENT_ID)');
+      const storedKey = (localStorage.getItem('NAVER_MAP_CLIENT_ID') || '').trim();
+      cleanClientId = storedKey || 'scqr0strs4';
+      setMapStatus('ncpClientId 없음 (fallback 사용)');
+    }
+
+    // 3. 200ms Polling interval for window.naver.maps
+    let attempts = 0;
+    const maxAttempts = 15;
+
+    const pollInterval = setInterval(() => {
+      attempts++;
+      if (window.naver && window.naver.maps) {
+        clearInterval(pollInterval);
+        createMapInstance();
+        setMapStatus('지도 로드 완료');
+      } else if (attempts >= maxAttempts) {
+        clearInterval(pollInterval);
+        if (!window.naver?.maps) {
+          setMapStatus('스크립트 로딩 타임아웃');
+        }
+      } else {
+        setMapStatus(`스크립트 로딩중 (Polling ${attempts}/15)`);
+      }
+    }, 200);
+
+    // If script is already in DOM & loaded
     if (window.naver && window.naver.maps) {
       createMapInstance();
-      return;
+      setMapStatus('지도 로드 완료');
+      clearInterval(pollInterval);
+      return () => clearInterval(pollInterval);
     }
 
-    // 2. Check if script tag is already in DOM
+    // If script tag is already injected
     const existingScript = document.getElementById('naver-map-script');
     if (existingScript) {
-      existingScript.addEventListener('load', createMapInstance);
-      return () => existingScript.removeEventListener('load', createMapInstance);
+      existingScript.addEventListener('load', () => {
+        createMapInstance();
+        setMapStatus('지도 로드 완료');
+      });
+      return () => clearInterval(pollInterval);
     }
 
-    // 3. Inject Script Dynamically into DOM with standardized single ncpClientId parameter
+    // Inject Script into DOM (Strictly using ncpClientId)
     const script = document.createElement('script');
     script.id = 'naver-map-script';
     script.type = 'text/javascript';
-    script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${clientId}&submodules=geocoder`;
+    script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${cleanClientId}&submodules=geocoder`;
     script.async = true;
 
     script.onload = () => {
       createMapInstance();
+      setMapStatus('지도 로드 완료');
+    };
+
+    script.onerror = () => {
+      setMapStatus('스크립트 로딩 실패');
     };
 
     document.head.appendChild(script);
+
+    return () => clearInterval(pollInterval);
   }, [createMapInstance]);
 
   // Robust Naver Map Resize & Re-initialization Trigger Helper
@@ -634,6 +697,11 @@ export default function NaverMapContainer({
         className="w-full flex-1 min-h-[300px] h-full relative z-10 box-border overflow-hidden"
         style={{ width: '100%', height: '100%' }}
       >
+        {/* 4. Live Map Status Monitoring Badge for Mobile Debugging */}
+        <div className="absolute top-2 left-2 z-40 bg-slate-950/90 text-emerald-400 font-mono text-[10px] font-bold px-2.5 py-1 rounded-md border border-emerald-500/50 shadow-md backdrop-blur-xs flex items-center gap-1.5 pointer-events-none">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          <span>[상태: {mapStatus}]</span>
+        </div>
         {isAuthFailed ? (
           <div className="absolute inset-0 z-30 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center text-white space-y-4">
             <div className="w-12 h-12 rounded-full bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400 shadow-lg animate-bounce">

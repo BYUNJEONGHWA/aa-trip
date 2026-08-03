@@ -208,9 +208,10 @@ export const useAppStore = create<AppState>()(
             });
 
             // Safe number parser helper to prevent "toFixed is not a function" TypeError
-            const parseNum = (val: any): number => {
-              const num = typeof val === 'number' ? val : parseFloat(String(val || 0));
-              return isNaN(num) ? 0 : num;
+            const parseNum = (val: any, fallbackValue: number = 0): number => {
+              if (val === null || val === undefined || val === '') return fallbackValue;
+              const num = Number(val);
+              return isNaN(num) ? fallbackValue : num;
             };
 
             // Helper for 2nd layer location signature (name + lat + lng)

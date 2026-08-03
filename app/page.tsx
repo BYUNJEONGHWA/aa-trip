@@ -54,97 +54,117 @@ export default function Home() {
 
   // Auto-sync / load latest real trip and places from Supabase on mount
   useEffect(() => {
+    let isMounted = true;
+
     async function autoLoadFromSupabase() {
-      if (isSupabaseConfigured()) {
-        try {
-          // Always load the most recently updated trip across devices
-          const loaded = await fetchLatestTripFromSupabase();
-          if (loaded) {
-            setActiveTrip(loaded.tripId, loaded.title);
-            loadFullTripState({
-              tripId: loaded.tripId,
-              title: loaded.title,
-              startDate: loaded.startDate || '2026-08-16',
-              dayCount: loaded.dayCount || 3,
-              places: loaded.places || [],
-              scheduledPlaces: loaded.scheduledPlaces || [],
-              dayItineraries: loaded.dayItineraries || [],
-            });
-          }
-        } catch (e) {
-          console.warn('Auto load from Supabase failed:', e);
+      if (!isMounted || !isSupabaseConfigured()) return;
+      try {
+        // Always load the most recently updated trip across devices
+        const loaded = await fetchLatestTripFromSupabase();
+        if (loaded && isMounted) {
+          setActiveTrip?.(loaded?.tripId, loaded?.title);
+          loadFullTripState?.({
+            tripId: loaded?.tripId,
+            title: loaded?.title,
+            startDate: loaded?.startDate || '2026-08-16',
+            dayCount: loaded?.dayCount || 3,
+            places: loaded?.places || [],
+            scheduledPlaces: loaded?.scheduledPlaces || [],
+            dayItineraries: loaded?.dayItineraries || [],
+          });
         }
+      } catch (e) {
+        console.warn('Auto load from Supabase failed:', e);
       }
     }
 
     autoLoadFromSupabase();
 
     // Subscribe to Supabase Realtime changes across devices
-    let unsubscribe = () => {};
+    let unsubscribe: any = null;
     if (isSupabaseConfigured()) {
-      unsubscribe = subscribeToTripChanges(() => {
-        autoLoadFromSupabase();
-      });
+      try {
+        unsubscribe = subscribeToTripChanges(() => {
+          if (isMounted) {
+            autoLoadFromSupabase();
+          }
+        });
+      } catch (e) {
+        console.warn('Realtime subscription setup failed:', e);
+      }
     }
 
     return () => {
+      isMounted = false;
       if (typeof unsubscribe === 'function') {
-        unsubscribe();
+        try { unsubscribe(); } catch (e) {}
       }
     };
   }, []);
 
   // Seamless automatic background update of place operating hours
   useEffect(() => {
-    async function autoUpdateOperatingHours() {
-      if (places.length === 0) return;
-      const outdatedPlaces = places.filter(
-        (p) =>
-          !p.operatingHours ||
-          (p.operatingHours.open === '09:00' && p.operatingHours.close === '21:00') ||
-          !p.parkingText ||
-          p.parkingText === '주차 정보 없음'
-      );
+    let isMounted = true;
 
-      if (outdatedPlaces.length > 0) {
-        const placeMap = new Map(places.map((p) => [p.id, p]));
+    async function autoUpdateOperatingHours() {
+      if (!places || places?.length === 0) return;
+      const outdatedPlaces = places?.filter(
+        (p) =>
+          !p?.operatingHours ||
+          (p?.operatingHours?.open === '09:00' && p?.operatingHours?.close === '21:00') ||
+          !p?.parkingText ||
+          p?.parkingText === '주차 정보 없음'
+      ) || [];
+
+      if (outdatedPlaces?.length > 0 && isMounted) {
+        const placeMap = new Map(places?.map((p) => [p?.id, p]));
         const chunkSize = 5;
 
         for (let i = 0; i < outdatedPlaces.length; i += chunkSize) {
+          if (!isMounted) break;
           const chunk = outdatedPlaces.slice(i, i + chunkSize);
           await Promise.all(
             chunk.map(async (p) => {
+              if (!p?.id) return;
               const cleanSid = p.id.replace(/^[^\d]+/, '').replace(/_\d+$/, '');
               if (/^\d+$/.test(cleanSid)) {
                 try {
                   const res = await fetch(`/api/parse-naver?sid=${cleanSid}`);
-                  if (res.ok) {
+                  if (res.ok && isMounted) {
                     const data = await res.json();
-                    if (data.success && data.place) {
+                    if (data?.success && data?.place) {
                       placeMap.set(p.id, {
                         ...p,
-                        operatingHours: data.place.operatingHours,
-                        dayOffs: data.place.dayOffs,
-                        isEveryday: data.place.isEveryday,
-                        dayOffRaw: data.place.dayOffRaw,
-                        holiday_text: data.place.holiday_text,
-                        hasParking: data.place.hasParking,
-                        parkingText: data.place.parkingText,
+                        operatingHours: data.place.operatingHours || p.operatingHours,
+                        isEveryday: data.place.isEveryday ?? p.isEveryday,
+                        dayOffs: data.place.dayOffs || p.dayOffs,
+                        dayOffRaw: data.place.dayOffRaw || p.dayOffRaw,
+                        holiday_text: data.place.holiday_text || p.holiday_text,
+                        hasParking: data.place.hasParking ?? p.hasParking,
+                        parkingText: data.place.parkingText || p.parkingText,
                       });
                     }
                   }
-                } catch (err) {}
+                } catch (e) {
+                  // Silent fail for background parser
+                }
               }
             })
           );
         }
 
-        addPlaces(Array.from(placeMap.values()));
+        if (isMounted) {
+          addPlaces?.(Array.from(placeMap.values()));
+        }
       }
     }
 
     autoUpdateOperatingHours();
-  }, [places.length]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [places?.length]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {

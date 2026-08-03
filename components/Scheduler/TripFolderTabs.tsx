@@ -41,25 +41,36 @@ export default function TripFolderTabs() {
     if (!isSupabaseConfigured()) return;
     try {
       const list = await fetchAllTripsFromSupabase();
-      setTrips(list);
+      setTrips(list || []);
     } catch (e) {
       console.warn('Load trips error:', e);
     }
   };
 
   useEffect(() => {
-    loadTripsList();
+    let isMounted = true;
 
-    let unsubscribe = () => {};
+    if (isMounted) {
+      loadTripsList();
+    }
+
+    let unsubscribe: any = null;
     if (isSupabaseConfigured()) {
-      unsubscribe = subscribeToTripChanges(() => {
-        loadTripsList();
-      });
+      try {
+        unsubscribe = subscribeToTripChanges(() => {
+          if (isMounted) {
+            loadTripsList();
+          }
+        });
+      } catch (e) {
+        console.warn('Realtime subscription setup error:', e);
+      }
     }
 
     return () => {
+      isMounted = false;
       if (typeof unsubscribe === 'function') {
-        unsubscribe();
+        try { unsubscribe(); } catch (e) {}
       }
     };
   }, [activeTripId]);

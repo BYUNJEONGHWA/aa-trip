@@ -2,15 +2,13 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { addDays, format, parseISO } from 'date-fns';
 import { Place, ScheduledPlace, DayItinerary, DayOfWeek } from './types';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://bktbgmscczwbcquxbhda.supabase.co').trim();
+const supabaseAnonKey = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_5dYwS8jHx5Md4eqxCFyh3Q_Y_3y5USi').trim();
 
 export const isSupabaseConfigured = (): boolean => {
   return (
     !!supabaseUrl &&
     !!supabaseAnonKey &&
-    supabaseUrl !== 'your_supabase_url_here' &&
-    supabaseAnonKey !== 'your_supabase_anon_key_here' &&
     supabaseUrl.startsWith('https://')
   );
 };

@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useAppStore } from '@/lib/store';
+import { saveTripToSupabase, isSupabaseConfigured } from '@/lib/supabase';
 import { Search, X, MapPin, Plus, Check, Loader2, Navigation, AlertCircle } from 'lucide-react';
 import { Place } from '@/lib/types';
 
@@ -112,6 +113,24 @@ export default function PlaceSearchModal() {
         }
       } catch (err) {
         console.warn('Background parse failed:', err);
+      }
+    }
+
+    // Immediately persist to Supabase DB
+    const state = useAppStore.getState();
+    if (isSupabaseConfigured()) {
+      try {
+        await saveTripToSupabase({
+          tripId: state.activeTripId,
+          title: state.activeTripTitle || '스마트 여행',
+          startDate: state.startDate,
+          dayCount: state.dayCount,
+          places: state.places,
+          scheduledPlaces: state.scheduledPlaces,
+          dayItineraries: state.dayItineraries,
+        });
+      } catch (e) {
+        console.warn('Instant save error during place search add:', e);
       }
     }
   };

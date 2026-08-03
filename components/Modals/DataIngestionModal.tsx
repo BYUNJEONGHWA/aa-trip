@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useAppStore } from '@/lib/store';
 import { parseRawPlaceInput } from '@/lib/naverParser';
+import { saveTripToSupabase, isSupabaseConfigured } from '@/lib/supabase';
 import { X, Upload, Sparkles, Check, Link as LinkIcon, FileText, Loader2, AlertCircle } from 'lucide-react';
 
 const SAMPLE_SHARED_URLS = [
@@ -44,16 +45,35 @@ export default function DataIngestionModal() {
 
       if (data.places && data.places.length > 0) {
         addPlaces(data.places);
+
+        // Immediately sync & persist to Supabase DB to prevent refresh loss
+        const state = useAppStore.getState();
+        if (isSupabaseConfigured()) {
+          try {
+            await saveTripToSupabase({
+              tripId: state.activeTripId,
+              title: state.activeTripTitle || '스마트 여행',
+              startDate: state.startDate,
+              dayCount: state.dayCount,
+              places: state.places,
+              scheduledPlaces: state.scheduledPlaces,
+              dayItineraries: state.dayItineraries,
+            });
+          } catch (e) {
+            console.warn('Instant save error during list ingest:', e);
+          }
+        }
+
         setStatusMsg({
           type: 'SUCCESS',
-          text: `🎉 네이버 지도 저장 목록에서 총 ${data.places.length}개의 장소(주소/영업시간/휴일/주차 정보)를 추출했습니다!`,
+          text: `🎉 네이버 지도 저장 목록에서 총 ${data.places.length}개의 장소를 추출하여 DB 저장을 완료했습니다!`,
         });
 
         setTimeout(() => {
           setStatusMsg(null);
           setIsIngestModalOpen(false);
           setListUrl('');
-        }, 1500);
+        }, 1200);
       }
     } catch (err: any) {
       setStatusMsg({

@@ -228,8 +228,11 @@ export default function NaverMapContainer({
       setIsAuthFailed(true);
     }
 
-    const storedKey = localStorage.getItem('NAVER_MAP_CLIENT_ID') || '';
-    const clientId = (storedKey || process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID || '6h6sixegq1').trim();
+    const envKey = (process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID || '').trim();
+    const storedKey = (localStorage.getItem('NAVER_MAP_CLIENT_ID') || '').trim();
+    
+    // Priority: Valid Env key > Valid Stored Key > Default Client ID
+    const clientId = envKey || storedKey || 'scqr0strs4';
 
     // 1. If window.naver.maps already exists
     if (window.naver && window.naver.maps) {
@@ -244,11 +247,11 @@ export default function NaverMapContainer({
       return () => existingScript.removeEventListener('load', createMapInstance);
     }
 
-    // 3. Inject Script Dynamically into DOM
+    // 3. Inject Script Dynamically into DOM with standardized single ncpClientId parameter
     const script = document.createElement('script');
     script.id = 'naver-map-script';
     script.type = 'text/javascript';
-    script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${clientId}&ncpClientId=${clientId}&submodules=geocoder`;
+    script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${clientId}&submodules=geocoder`;
     script.async = true;
 
     script.onload = () => {

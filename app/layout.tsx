@@ -15,7 +15,7 @@ export const viewport: Viewport = {
   viewportFit: 'cover',
 };
 
-const navKey = (process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID || '6h6sixegq1').trim();
+const navKey = (process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID || 'scqr0strs4').trim();
 
 export default function RootLayout({
   children,

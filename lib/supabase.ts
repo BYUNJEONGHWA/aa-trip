@@ -31,6 +31,22 @@ export interface SavedTripPayload {
 }
 
 /**
+ * Update trip title directly in Supabase DB
+ */
+export async function updateTripTitleInSupabase(tripId: string, title: string) {
+  if (!supabase) return false;
+  const { error } = await supabase
+    .from('trips')
+    .update({ title, updated_at: new Date().toISOString() })
+    .eq('id', tripId);
+  if (error) {
+    console.warn('Update trip title error:', error.message);
+    return false;
+  }
+  return true;
+}
+
+/**
  * Save current trip & places state to Supabase
  */
 export async function saveTripToSupabase(payload: SavedTripPayload) {
@@ -51,10 +67,11 @@ export async function saveTripToSupabase(payload: SavedTripPayload) {
 
   if (tripError) throw tripError;
 
-  // 2. Upsert Places library
+  // 2. Upsert Places library (scoped by tripId)
   if (places.length > 0) {
     const placesData = places.map((p) => ({
       id: p.id,
+      trip_id: tripId,
       name: p.name,
       category: p.category,
       address: p.address,
@@ -115,8 +132,8 @@ export async function loadTripFromSupabase(tripId: string): Promise<SavedTripPay
   const { data: trip, error: tripErr } = await supabase.from('trips').select('*').eq('id', tripId).single();
   if (tripErr || !trip) return null;
 
-  // 2. Fetch Places
-  const { data: placesData } = await supabase.from('places').select('*');
+  // 2. Fetch Places for THIS SPECIFIC TRIP
+  const { data: placesData } = await supabase.from('places').select('*').eq('trip_id', tripId);
   const places: Place[] = (placesData || []).map((p: any) => ({
     id: p.id,
     name: p.name,

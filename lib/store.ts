@@ -368,8 +368,8 @@ export const useAppStore = create<AppState>()(
             ...(title ? { activeTripTitle: title } : {}),
             startDate,
             dayCount,
-            places,
-            scheduledPlaces,
+            places: places || [],
+            scheduledPlaces: scheduledPlaces || [],
             dayItineraries: newItineraries,
             activeDayIndex: 0,
           });

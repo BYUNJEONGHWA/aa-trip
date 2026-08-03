@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS public.trips (
 -- 2. Create Places Library Table
 CREATE TABLE IF NOT EXISTS public.places (
     id TEXT PRIMARY KEY,
+    trip_id TEXT REFERENCES public.trips(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     category TEXT NOT NULL DEFAULT '장소',
     address TEXT DEFAULT '',
@@ -29,6 +30,9 @@ CREATE TABLE IF NOT EXISTS public.places (
     off_rules JSONB DEFAULT '[]'::jsonb,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Ensure trip_id exists even on existing tables
+ALTER TABLE public.places ADD COLUMN IF NOT EXISTS trip_id TEXT REFERENCES public.trips(id) ON DELETE CASCADE;
 
 -- 3. Create Scheduled Places Table
 CREATE TABLE IF NOT EXISTS public.scheduled_places (
@@ -64,5 +68,6 @@ CREATE POLICY "Allow public all access on scheduled_places" ON public.scheduled_
 CREATE POLICY "Allow public all access on day_itineraries" ON public.day_itineraries FOR ALL USING (true) WITH CHECK (true);
 
 -- 6. Indexes for High Performance Queries
+CREATE INDEX IF NOT EXISTS idx_places_trip_id ON public.places(trip_id);
 CREATE INDEX IF NOT EXISTS idx_scheduled_places_trip_id ON public.scheduled_places(trip_id);
 CREATE INDEX IF NOT EXISTS idx_day_itineraries_trip_id ON public.day_itineraries(trip_id);

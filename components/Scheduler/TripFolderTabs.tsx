@@ -6,6 +6,7 @@ import {
   fetchAllTripsFromSupabase,
   loadTripFromSupabase,
   saveTripToSupabase,
+  updateTripTitleInSupabase,
   isSupabaseConfigured,
   supabase,
 } from '@/lib/supabase';
@@ -49,9 +50,9 @@ export default function TripFolderTabs() {
     loadTripsList();
   }, [activeTripId]);
 
-  // Debounced Real-time Auto-Save to Supabase DB
+  // Debounced Real-time Auto-Save to Supabase DB (Guards removed for 0-place trips)
   useEffect(() => {
-    if (!isSupabaseConfigured() || places.length === 0) return;
+    if (!isSupabaseConfigured()) return;
 
     setAutoSaveStatus('saving');
     const timer = setTimeout(async () => {
@@ -76,7 +77,7 @@ export default function TripFolderTabs() {
     return () => clearTimeout(timer);
   }, [places, scheduledPlaces, dayItineraries, startDate, dayCount, activeTripId, activeTripTitle]);
 
-  // Switch Active Trip Folder
+  // Switch Active Trip Folder with isolated places/schedules
   const handleSelectTrip = async (trip: any) => {
     if (editingTripId) return; // Ignore switch if currently editing
     if (trip.id === activeTripId) return;
@@ -86,38 +87,38 @@ export default function TripFolderTabs() {
       const targetTitle = loaded?.title || trip.title || '여행 일정';
       setActiveTrip(trip.id, targetTitle);
 
-      if (loaded) {
-        loadFullTripState({
-          tripId: trip.id,
-          title: targetTitle,
-          startDate: loaded.startDate || '2026-08-16',
-          dayCount: loaded.dayCount || 3,
-          places: loaded.places || [],
-          scheduledPlaces: loaded.scheduledPlaces || [],
-          dayItineraries: loaded.dayItineraries || [],
-        });
-      }
+      loadFullTripState({
+        tripId: trip.id,
+        title: targetTitle,
+        startDate: loaded?.startDate || '2026-08-16',
+        dayCount: loaded?.dayCount || 3,
+        places: loaded?.places || [],
+        scheduledPlaces: loaded?.scheduledPlaces || [],
+        dayItineraries: loaded?.dayItineraries || [],
+      });
     } catch (e) {
       console.warn('Load trip failed:', e);
     }
   };
 
-  // Create New Trip Folder
+  // Create New Trip Folder (Clean isolated state)
   const handleCreateTrip = async () => {
     const title = newTitle.trim();
     if (!title) return;
 
     const newTripId = `trip_${Date.now()}`;
     try {
-      await saveTripToSupabase({
-        tripId: newTripId,
-        title,
-        startDate: '2026-08-16',
-        dayCount: 3,
-        places: [],
-        scheduledPlaces: [],
-        dayItineraries: [],
-      });
+      if (isSupabaseConfigured()) {
+        await saveTripToSupabase({
+          tripId: newTripId,
+          title,
+          startDate: '2026-08-16',
+          dayCount: 3,
+          places: [],
+          scheduledPlaces: [],
+          dayItineraries: [],
+        });
+      }
 
       setActiveTrip(newTripId, title);
       loadFullTripState({
@@ -127,6 +128,7 @@ export default function TripFolderTabs() {
         dayCount: 3,
         places: [],
         scheduledPlaces: [],
+        dayItineraries: [],
       });
 
       setNewTitle('');
@@ -137,9 +139,9 @@ export default function TripFolderTabs() {
     }
   };
 
-  // Rename Trip Folder
-  const startRenameTrip = (tripId: string, currentTitle: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  // Rename Trip Folder (Mobile Touch & Enter & Blur Support)
+  const startRenameTrip = (tripId: string, currentTitle: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     setEditingTripId(tripId);
     setEditingTitle(currentTitle);
   };
@@ -157,21 +159,16 @@ export default function TripFolderTabs() {
       }
 
       if (isSupabaseConfigured()) {
-        await saveTripToSupabase({
-          tripId,
-          title,
-          startDate,
-          dayCount,
-          places,
-          scheduledPlaces,
-          dayItineraries,
-        });
+        setAutoSaveStatus('saving');
+        await updateTripTitleInSupabase(tripId, title);
+        setAutoSaveStatus('saved');
       }
 
       setEditingTripId(null);
       await loadTripsList();
     } catch (e) {
       console.warn('Rename trip error:', e);
+      setAutoSaveStatus('idle');
     }
   };
 
@@ -192,6 +189,7 @@ export default function TripFolderTabs() {
             dayCount: loaded.dayCount || 3,
             places: loaded.places || [],
             scheduledPlaces: loaded.scheduledPlaces || [],
+            dayItineraries: loaded.dayItineraries || [],
           });
         }
       }
@@ -224,19 +222,26 @@ export default function TripFolderTabs() {
                   type="text"
                   value={editingTitle}
                   onChange={(e) => setEditingTitle(e.target.value)}
+                  onBlur={() => handleSaveRename(t.id)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSaveRename(t.id)}
                   className="px-2 py-0.5 text-xs font-black bg-white border border-amber-300 rounded outline-none text-slate-900 w-32"
                   autoFocus
                 />
                 <button
-                  onClick={() => handleSaveRename(t.id)}
+                  onMouseDown={(e) => {
+                    e.preventDefault(); // Prevent onBlur from triggering before onClick
+                    handleSaveRename(t.id);
+                  }}
                   className="p-1 bg-emerald-600 text-white rounded hover:bg-emerald-700"
                   title="폴더명 저장"
                 >
                   <Check className="w-3 h-3" />
                 </button>
                 <button
-                  onClick={() => setEditingTripId(null)}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    setEditingTripId(null);
+                  }}
                   className="p-1 text-slate-500 rounded hover:bg-slate-200"
                   title="취소"
                 >
@@ -256,30 +261,32 @@ export default function TripFolderTabs() {
                   ? 'bg-slate-900 text-white border-slate-900 shadow-xs scale-[1.02]'
                   : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-200'
               }`}
-              title="더블 클릭하여 폴더명 수정"
+              title="클릭하여 폴더 선택 / 버튼 터치하여 이름 수정"
             >
               <Folder className={`w-3 h-3 ${isActive ? 'text-amber-300' : 'text-slate-500'}`} />
               <span>{t.title || '여행 폴더'}</span>
 
               <button
                 onClick={(e) => startRenameTrip(t.id, t.title, e)}
-                className={`p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity ${
-                  isActive ? 'hover:bg-slate-800 text-slate-300' : 'hover:bg-slate-300 text-slate-500'
+                className={`p-1 rounded transition-opacity ${
+                  isActive
+                    ? 'hover:bg-slate-800 text-slate-300 opacity-90'
+                    : 'hover:bg-slate-300 text-slate-500 opacity-70 group-hover:opacity-100'
                 }`}
                 title="폴더 이름 변경"
               >
-                <Edit2 className="w-2.5 h-2.5" />
+                <Edit2 className="w-3 h-3" />
               </button>
 
               {t.id !== 'aa_trip_main' && (
                 <button
                   onClick={(e) => handleDeleteTrip(t.id, t.title, e)}
-                  className={`p-0.5 rounded hover:bg-rose-500 hover:text-white transition-colors ${
+                  className={`p-1 rounded hover:bg-rose-500 hover:text-white transition-colors ${
                     isActive ? 'text-slate-400' : 'text-slate-400'
                   }`}
                   title="폴더 삭제"
                 >
-                  <Trash2 className="w-2.5 h-2.5" />
+                  <Trash2 className="w-3 h-3" />
                 </button>
               )}
             </div>

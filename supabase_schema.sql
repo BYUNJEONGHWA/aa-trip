@@ -28,11 +28,15 @@ CREATE TABLE IF NOT EXISTS public.places (
     day_off_raw TEXT DEFAULT '',
     holiday_text TEXT DEFAULT '',
     off_rules JSONB DEFAULT '[]'::jsonb,
+    has_parking BOOLEAN DEFAULT FALSE,
+    parking_text TEXT DEFAULT '',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Ensure trip_id exists even on existing tables
+-- Ensure columns exist even on existing tables (Migration / Patch)
 ALTER TABLE public.places ADD COLUMN IF NOT EXISTS trip_id TEXT REFERENCES public.trips(id) ON DELETE CASCADE;
+ALTER TABLE public.places ADD COLUMN IF NOT EXISTS has_parking BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.places ADD COLUMN IF NOT EXISTS parking_text TEXT DEFAULT '';
 
 -- 3. Create Scheduled Places Table
 CREATE TABLE IF NOT EXISTS public.scheduled_places (
@@ -62,6 +66,11 @@ ALTER TABLE public.scheduled_places ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.day_itineraries ENABLE ROW LEVEL SECURITY;
 
 -- Allow Public Read/Write Access (Anon Role) for smooth demonstration
+DROP POLICY IF EXISTS "Allow public all access on trips" ON public.trips;
+DROP POLICY IF EXISTS "Allow public all access on places" ON public.places;
+DROP POLICY IF EXISTS "Allow public all access on scheduled_places" ON public.scheduled_places;
+DROP POLICY IF EXISTS "Allow public all access on day_itineraries" ON public.day_itineraries;
+
 CREATE POLICY "Allow public all access on trips" ON public.trips FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow public all access on places" ON public.places FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow public all access on scheduled_places" ON public.scheduled_places FOR ALL USING (true) WITH CHECK (true);

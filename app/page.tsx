@@ -19,6 +19,7 @@ import {
   loadTripFromSupabase,
   fetchLatestTripFromSupabase,
   subscribeToTripChanges,
+  saveTripToSupabase,
 } from '@/lib/supabase';
 import {
   DndContext,
@@ -48,6 +49,10 @@ export default function Home() {
     isDbInitialLoaded,
     setIsDbInitialLoaded,
     loadFullTripState,
+    dayItineraries,
+    startDate,
+    dayCount,
+    setAutoSaveStatus,
   } = useAppStore();
 
   const [activeDragItem, setActiveDragItem] = useState<any>(null);
@@ -111,6 +116,50 @@ export default function Home() {
       }
     };
   }, []);
+
+  // Debounced Auto-Save Effect: Auto save to Supabase whenever places, schedules, notes, or dates change
+  const isFirstAutoSaveRun = React.useRef(true);
+
+  useEffect(() => {
+    if (!isDbInitialLoaded || !isSupabaseConfigured()) return;
+
+    if (isFirstAutoSaveRun.current) {
+      isFirstAutoSaveRun.current = false;
+      return;
+    }
+
+    setAutoSaveStatus('saving');
+    const timer = setTimeout(async () => {
+      try {
+        await saveTripToSupabase({
+          tripId: activeTripId || 'aa_trip_main',
+          title: activeTripTitle || '스마트 여행 일정',
+          startDate,
+          dayCount,
+          places,
+          scheduledPlaces,
+          dayItineraries,
+        });
+        setAutoSaveStatus('saved');
+        setTimeout(() => setAutoSaveStatus('idle'), 3000);
+      } catch (err) {
+        console.warn('Auto save error:', err);
+        setAutoSaveStatus('error');
+      }
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [
+    places,
+    scheduledPlaces,
+    dayItineraries,
+    startDate,
+    dayCount,
+    activeTripId,
+    activeTripTitle,
+    isDbInitialLoaded,
+    setAutoSaveStatus,
+  ]);
 
   // Seamless automatic background update of place operating hours
   useEffect(() => {

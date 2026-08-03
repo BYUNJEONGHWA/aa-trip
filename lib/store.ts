@@ -37,6 +37,9 @@ interface AppState {
   isSearchModalOpen: boolean;
   isSupabaseModalOpen: boolean;
 
+  autoSaveStatus: 'idle' | 'saving' | 'saved' | 'error';
+  setAutoSaveStatus: (status: 'idle' | 'saving' | 'saved' | 'error') => void;
+
   // Actions
   isDbInitialLoaded: boolean;
   setIsDbInitialLoaded: (loaded: boolean) => void;
@@ -129,6 +132,8 @@ export const useAppStore = create<AppState>()(
         isExportModalOpen: false,
         isSearchModalOpen: false,
         isSupabaseModalOpen: false,
+        autoSaveStatus: 'idle',
+        setAutoSaveStatus: (status) => set({ autoSaveStatus: status }),
 
         isDbInitialLoaded: false,
         setIsDbInitialLoaded: (loaded) => set({ isDbInitialLoaded: loaded }),

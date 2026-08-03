@@ -140,14 +140,23 @@ export default function SupabaseSyncModal() {
 
   const sqlSchemaCode = `-- Supabase DDL SQL Schema Script
 CREATE TABLE IF NOT EXISTS trips (id TEXT PRIMARY KEY, title TEXT, start_date DATE, day_count INT, updated_at TIMESTAMPTZ DEFAULT NOW());
-CREATE TABLE IF NOT EXISTS places (id TEXT PRIMARY KEY, name TEXT, category TEXT, address TEXT, lat DOUBLE PRECISION, lng DOUBLE PRECISION, operating_hours JSONB, is_everyday BOOLEAN, day_offs JSONB, day_off_raw TEXT, holiday_text TEXT, off_rules JSONB);
+CREATE TABLE IF NOT EXISTS places (id TEXT PRIMARY KEY, name TEXT, category TEXT, address TEXT, lat DOUBLE PRECISION, lng DOUBLE PRECISION, operating_hours JSONB, is_everyday BOOLEAN, day_offs JSONB, day_off_raw TEXT, holiday_text TEXT, off_rules JSONB, has_parking BOOLEAN DEFAULT FALSE, parking_text TEXT);
 CREATE TABLE IF NOT EXISTS scheduled_places (id BIGSERIAL PRIMARY KEY, schedule_id TEXT, trip_id TEXT REFERENCES trips(id) ON DELETE CASCADE, place_id TEXT REFERENCES places(id) ON DELETE CASCADE, day_index INT, order_index INT);
 CREATE TABLE IF NOT EXISTS day_itineraries (id BIGSERIAL PRIMARY KEY, trip_id TEXT REFERENCES trips(id) ON DELETE CASCADE, day_index INT, date_str DATE, notes TEXT);
+
+-- Migration for existing places table
+ALTER TABLE places ADD COLUMN IF NOT EXISTS has_parking BOOLEAN DEFAULT FALSE;
+ALTER TABLE places ADD COLUMN IF NOT EXISTS parking_text TEXT;
 
 ALTER TABLE trips ENABLE ROW LEVEL SECURITY;
 ALTER TABLE places ENABLE ROW LEVEL SECURITY;
 ALTER TABLE scheduled_places ENABLE ROW LEVEL SECURITY;
 ALTER TABLE day_itineraries ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow public all access on trips" ON trips;
+DROP POLICY IF EXISTS "Allow public all access on places" ON places;
+DROP POLICY IF EXISTS "Allow public all access on scheduled_places" ON scheduled_places;
+DROP POLICY IF EXISTS "Allow public all access on day_itineraries" ON day_itineraries;
 
 CREATE POLICY "Allow public all access on trips" ON trips FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow public all access on places" ON places FOR ALL USING (true) WITH CHECK (true);

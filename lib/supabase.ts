@@ -153,9 +153,12 @@ async function writeTripRows(payload: SavedTripPayload) {
     const scheduledData = scheduledPlaces.map((s) => ({
       trip_id: tripId,
       schedule_id: s.scheduleId,
-      place_id: s.placeId,
+      place_id: s.placeId || null, // BREAK items carry no real place
       day_index: s.dayIndex,
       order_index: s.order,
+      item_type: s.type || 'PLACE',
+      break_label: s.breakLabel || null,
+      break_duration_minutes: s.breakDurationMinutes ?? null,
     }));
 
     const { error: schedError } = await supabase.from('scheduled_places').insert(scheduledData);
@@ -243,9 +246,12 @@ export async function loadTripFromSupabase(tripId: string): Promise<SavedTripPay
     seenScheduleIds.add(scheduleId);
     scheduledPlaces.push({
       scheduleId,
-      placeId: s.place_id,
+      placeId: s.place_id || '',
       dayIndex: s.day_index,
       order: s.order_index,
+      type: s.item_type === 'BREAK' ? 'BREAK' : 'PLACE',
+      breakLabel: s.break_label || undefined,
+      breakDurationMinutes: s.break_duration_minutes ?? undefined,
     });
   });
 

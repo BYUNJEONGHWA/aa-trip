@@ -14,7 +14,15 @@ interface PlaceCardProps {
 }
 
 export default function PlaceCard({ place, isDragOverlay }: PlaceCardProps) {
-  const { activeDayIndex, addPlaceToDay, removePlace, scheduledPlaces, selectedPlaceId } = useAppStore();
+  const {
+    activeDayIndex,
+    addPlaceToDay,
+    removePlace,
+    scheduledPlaces,
+    selectedPlaceId,
+    setSelectedPlaceId,
+    setFocusPlaceLocation,
+  } = useAppStore();
   const cardRef = useRef<HTMLDivElement | null>(null);
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
@@ -23,6 +31,11 @@ export default function PlaceCard({ place, isDragOverlay }: PlaceCardProps) {
   });
 
   const isSelected = selectedPlaceId === place.id;
+
+  const handleCardClick = () => {
+    setSelectedPlaceId(place.id);
+    setFocusPlaceLocation({ lat: place.lat, lng: place.lng, timestamp: Date.now() });
+  };
 
   // Auto-scroll sidebar to this place card when marker is clicked on map
   useEffect(() => {
@@ -47,6 +60,7 @@ export default function PlaceCard({ place, isDragOverlay }: PlaceCardProps) {
         setNodeRef(node);
       }}
       style={style}
+      onClick={handleCardClick}
       {...listeners}
       {...attributes}
       className={`group relative rounded-xl p-3.5 border transition-all duration-200 cursor-grab active:cursor-grabbing ${

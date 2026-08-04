@@ -5,7 +5,7 @@ import { Place, ScheduledPlace } from '@/lib/types';
 import { useAppStore } from '@/lib/store';
 import { getDayColorTheme } from '@/lib/constants';
 import { validateScheduledPlace, calculateDistanceKm, estimateTravelTimeMinutes } from '@/lib/routeOptimizer';
-import { Trash2, AlertTriangle, Clock, Navigation, GripVertical } from 'lucide-react';
+import { Trash2, AlertTriangle, Clock, Navigation, GripVertical, Coffee } from 'lucide-react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
@@ -26,6 +26,7 @@ export default function ScheduledCard({
     places,
     dayItineraries,
     removeScheduledPlace,
+    updateBreak,
     selectedPlaceId,
     setSelectedPlaceId,
     setFocusPlaceLocation,
@@ -67,6 +68,76 @@ export default function ScheduledCard({
       cardRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   }, [isSelected]);
+
+  if (scheduledPlace.type === 'BREAK') {
+    const style = {
+      transform: CSS.Translate.toString(transform),
+      transition,
+    };
+
+    return (
+      <div
+        ref={(node) => {
+          cardRef.current = node;
+          setNodeRef(node);
+        }}
+        style={style}
+        className={`relative group flex flex-col gap-2 transition-all ${
+          isDragging ? 'opacity-30 scale-95' : ''
+        }`}
+      >
+        <div className="bg-amber-50/60 rounded-xl p-3 border border-dashed border-amber-300">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 min-w-0 flex-1">
+              <div
+                {...listeners}
+                {...attributes}
+                className="touch-none cursor-grab active:cursor-grabbing p-0.5 text-amber-300 hover:text-amber-600 rounded shrink-0 transition-colors"
+                title="드래그해서 순서/일차 변경"
+              >
+                <GripVertical className="w-3.5 h-3.5" />
+              </div>
+              <Coffee className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+              <input
+                type="text"
+                value={scheduledPlace.breakLabel ?? ''}
+                onChange={(e) => updateBreak(scheduledPlace.scheduleId, { breakLabel: e.target.value })}
+                onClick={(e) => e.stopPropagation()}
+                placeholder="휴식"
+                className="text-xs font-bold text-amber-900 bg-transparent focus:outline-none min-w-0 flex-1"
+              />
+            </div>
+
+            <button
+              onClick={() => removeScheduledPlace(scheduledPlace.scheduleId)}
+              className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors shrink-0"
+              title="일정에서 삭제"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          <div className="flex items-center gap-1 pl-5 mt-1">
+            <Clock className="w-3 h-3 text-amber-500 shrink-0" />
+            <input
+              type="number"
+              min={0}
+              step={5}
+              value={scheduledPlace.breakDurationMinutes ?? 30}
+              onChange={(e) =>
+                updateBreak(scheduledPlace.scheduleId, {
+                  breakDurationMinutes: Math.max(0, Number(e.target.value) || 0),
+                })
+              }
+              onClick={(e) => e.stopPropagation()}
+              className="w-12 text-xs font-semibold text-amber-800 bg-transparent focus:outline-none"
+            />
+            <span className="text-[11px] text-amber-700 font-medium">분</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!place || !currentDayInfo) return null;
 
@@ -118,7 +189,7 @@ export default function ScheduledCard({
             <div
               {...listeners}
               {...attributes}
-              className="cursor-grab active:cursor-grabbing p-0.5 text-slate-300 hover:text-slate-600 rounded shrink-0 transition-colors"
+              className="touch-none cursor-grab active:cursor-grabbing p-0.5 text-slate-300 hover:text-slate-600 rounded shrink-0 transition-colors"
               title="드래그해서 순서/일차 변경"
             >
               <GripVertical className="w-3.5 h-3.5" />

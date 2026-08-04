@@ -39,15 +39,25 @@ ALTER TABLE public.places ADD COLUMN IF NOT EXISTS has_parking BOOLEAN DEFAULT F
 ALTER TABLE public.places ADD COLUMN IF NOT EXISTS parking_text TEXT DEFAULT '';
 
 -- 3. Create Scheduled Places Table
+-- place_id is nullable because BREAK items (item_type = 'BREAK') are not a real place.
 CREATE TABLE IF NOT EXISTS public.scheduled_places (
     id BIGSERIAL PRIMARY KEY,
     schedule_id TEXT NOT NULL,
     trip_id TEXT NOT NULL REFERENCES public.trips(id) ON DELETE CASCADE,
-    place_id TEXT NOT NULL REFERENCES public.places(id) ON DELETE CASCADE,
+    place_id TEXT REFERENCES public.places(id) ON DELETE CASCADE,
     day_index INT NOT NULL DEFAULT 0,
     order_index INT NOT NULL DEFAULT 0,
+    item_type TEXT NOT NULL DEFAULT 'PLACE',
+    break_label TEXT,
+    break_duration_minutes INT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Ensure columns/constraints exist even on existing tables (Migration / Patch)
+ALTER TABLE public.scheduled_places ALTER COLUMN place_id DROP NOT NULL;
+ALTER TABLE public.scheduled_places ADD COLUMN IF NOT EXISTS item_type TEXT NOT NULL DEFAULT 'PLACE';
+ALTER TABLE public.scheduled_places ADD COLUMN IF NOT EXISTS break_label TEXT;
+ALTER TABLE public.scheduled_places ADD COLUMN IF NOT EXISTS break_duration_minutes INT;
 
 -- 4. Create Day Itineraries & Notes Table
 CREATE TABLE IF NOT EXISTS public.day_itineraries (

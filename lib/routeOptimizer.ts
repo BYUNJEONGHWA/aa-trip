@@ -35,21 +35,26 @@ export function estimateTravelTimeMinutes(distanceKm: number): number {
 
 /**
  * Route Optimization (Nearest Neighbor Algorithm)
+ *
+ * BREAK items (and any place item missing from placeMap) have no coordinates to route
+ * through, so they are kept fixed in their original slot; only the real place visits
+ * around them are reordered by nearest-neighbor and poured back into the remaining slots.
  */
 export function optimizeRouteOrder(
   scheduledList: ScheduledPlace[],
   placeMap: Map<string, Place>
 ): ScheduledPlace[] {
-  if (scheduledList.length <= 2) return scheduledList;
+  const sorted = [...scheduledList].sort((a, b) => a.order - b.order);
 
-  const validItems = scheduledList.filter((item) => placeMap.has(item.placeId));
-  if (validItems.length <= 2) return scheduledList;
+  const isRoutable = (item: ScheduledPlace) => item.type !== 'BREAK' && placeMap.has(item.placeId);
+  const validItems = sorted.filter(isRoutable);
+  if (validItems.length <= 2) return sorted.map((item, idx) => ({ ...item, order: idx }));
 
   const unvisited = [...validItems];
-  const result: ScheduledPlace[] = [];
+  const visitOrder: ScheduledPlace[] = [];
 
   let current = unvisited.shift()!;
-  result.push(current);
+  visitOrder.push(current);
 
   while (unvisited.length > 0) {
     const currentPlace = placeMap.get(current.placeId)!;
@@ -71,13 +76,13 @@ export function optimizeRouteOrder(
     }
 
     current = unvisited.splice(nearestIndex, 1)[0];
-    result.push(current);
+    visitOrder.push(current);
   }
 
-  return result.map((item, idx) => ({
-    ...item,
-    order: idx,
-  }));
+  let visitCursor = 0;
+  const merged = sorted.map((item) => (isRoutable(item) ? visitOrder[visitCursor++] : item));
+
+  return merged.map((item, idx) => ({ ...item, order: idx }));
 }
 
 // 1. 요일 매핑 배열 (JS Date.getDay() 기준: 0=일, 1=월, 2=화, 3=수, 4=목, 5=금, 6=토)

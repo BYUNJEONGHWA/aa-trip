@@ -58,6 +58,8 @@ interface AppState {
   removePlace: (placeId: string) => void;
 
   addPlaceToDay: (placeId: string, dayIndex: number) => void;
+  addBreakToDay: (dayIndex: number) => void;
+  updateBreak: (scheduleId: string, updates: { breakLabel?: string; breakDurationMinutes?: number }) => void;
   removeScheduledPlace: (scheduleId: string) => void;
   reorderDaySchedule: (dayIndex: number, activeScheduleId: string, overScheduleId: string) => void;
   moveScheduleToDay: (scheduleId: string, targetDayIndex: number) => void;
@@ -273,6 +275,33 @@ export const useAppStore = create<AppState>()(
               activeDayIndex: dayIndex,
             };
           });
+        },
+
+        addBreakToDay: (dayIndex) => {
+          set((state) => {
+            const dayItems = state.scheduledPlaces.filter((s) => s.dayIndex === dayIndex);
+            const newBreak: ScheduledPlace = {
+              scheduleId: `break_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+              placeId: '',
+              dayIndex,
+              order: dayItems.length,
+              type: 'BREAK',
+              breakLabel: '휴식',
+              breakDurationMinutes: 30,
+            };
+            return {
+              scheduledPlaces: [...state.scheduledPlaces, newBreak],
+              activeDayIndex: dayIndex,
+            };
+          });
+        },
+
+        updateBreak: (scheduleId, updates) => {
+          set((state) => ({
+            scheduledPlaces: state.scheduledPlaces.map((s) =>
+              s.scheduleId === scheduleId ? { ...s, ...updates } : s
+            ),
+          }));
         },
 
         removeScheduledPlace: (scheduleId) => {

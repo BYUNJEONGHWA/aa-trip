@@ -13,6 +13,7 @@ import {
   FileText,
   Trash2,
   MapPin,
+  Coffee,
 } from 'lucide-react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
@@ -26,6 +27,7 @@ export default function DayColumn({ itinerary }: DayColumnProps) {
     places,
     scheduledPlaces,
     optimizeDayRoute,
+    addBreakToDay,
     updateDayNotes,
     removeDay,
     updateDayDate,
@@ -47,6 +49,9 @@ export default function DayColumn({ itinerary }: DayColumnProps) {
   const daySchedules = scheduledPlaces
     .filter((s) => s.dayIndex === itinerary.dayIndex)
     .sort((a, b) => a.order - b.order);
+
+  const breakCount = daySchedules.filter((s) => s.type === 'BREAK').length;
+  const placeCount = daySchedules.length - breakCount;
 
   // Check for any validation warnings in this day using exact dateStr
   const dayOffWarnings = daySchedules.filter((s) => {
@@ -133,21 +138,36 @@ export default function DayColumn({ itinerary }: DayColumnProps) {
       {/* Action Toolbar */}
       <div className="px-3.5 py-2 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs text-slate-600 shrink-0">
         <div className="flex items-center gap-2">
-          <span className="font-bold text-slate-900">{daySchedules.length}개 장소</span>
+          <span className="font-bold text-slate-900">
+            {placeCount}개 장소{breakCount > 0 ? ` · ${breakCount}개 휴식` : ''}
+          </span>
         </div>
 
-        {daySchedules.length > 1 && (
+        <div className="flex items-center gap-1.5">
           <button
             onClick={(e) => {
               e.stopPropagation();
-              optimizeDayRoute(itinerary.dayIndex);
+              addBreakToDay(itinerary.dayIndex);
             }}
-            className="flex items-center gap-1 text-[11px] font-extrabold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded border border-emerald-200 transition-all shadow-2xs"
+            className="flex items-center gap-1 text-[11px] font-extrabold text-amber-700 bg-amber-50 hover:bg-amber-100 px-2 py-1 rounded border border-amber-200 transition-all shadow-2xs"
           >
-            <Sparkles className="w-3 h-3 text-emerald-600" />
-            <span>최단 동선 정렬</span>
+            <Coffee className="w-3 h-3 text-amber-600" />
+            <span>휴식시간 추가</span>
           </button>
-        )}
+
+          {daySchedules.length > 1 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                optimizeDayRoute(itinerary.dayIndex);
+              }}
+              className="flex items-center gap-1 text-[11px] font-extrabold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded border border-emerald-200 transition-all shadow-2xs"
+            >
+              <Sparkles className="w-3 h-3 text-emerald-600" />
+              <span>최단 동선 정렬</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Scheduled Card List Area - Droppable & Sortable */}

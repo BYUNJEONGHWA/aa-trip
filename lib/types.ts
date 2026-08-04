@@ -53,9 +53,12 @@ export interface Place {
 
 export interface ScheduledPlace {
   scheduleId: string; // Unique ID for instance in itinerary
-  placeId: string;
+  placeId: string; // Empty string for BREAK items (no real place)
   dayIndex: number; // 0 for Day 1, 1 for Day 2, etc.
   order: number; // Sequence index within the day (0, 1, 2...)
+  type?: 'PLACE' | 'BREAK'; // Defaults to 'PLACE' when omitted
+  breakLabel?: string; // e.g. "점심 식사", "휴식" - only for BREAK items
+  breakDurationMinutes?: number; // e.g. 30 - only for BREAK items
   startTime?: string; // e.g. "10:30"
   endTime?: string;   // e.g. "12:00"
   notes?: string;

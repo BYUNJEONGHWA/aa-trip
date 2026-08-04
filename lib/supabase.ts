@@ -60,9 +60,12 @@ let saveChain: Promise<any> = Promise.resolve();
  */
 let selfWriteDepth = 0;
 let lastSelfWriteEndedAt = 0;
-// Change events lag the write that caused them, so keep ignoring them briefly after
-// the save finishes — otherwise a late echo still restarts the reload/save loop.
-const SELF_WRITE_ECHO_GRACE_MS = 2000;
+// Change events lag the write that caused them, so keep ignoring them briefly after the
+// save finishes. Kept SHORT: while this window is open a genuine change from ANOTHER
+// device is also ignored, which would delay cross-device sync. The save->reload->save
+// loop is prevented at the source in app/page.tsx (skipNextAutoSaveRef), so this only
+// needs to cover the event-delivery lag of our own write.
+const SELF_WRITE_ECHO_GRACE_MS = 400;
 export const isSelfWriting = () =>
   selfWriteDepth > 0 || Date.now() - lastSelfWriteEndedAt < SELF_WRITE_ECHO_GRACE_MS;
 
@@ -319,10 +322,41 @@ export async function fetchAllTripsFromSupabase() {
 }
 
 /**
+ * Result of the initial load. The caller MUST be able to tell "there is genuinely no
+ * trip yet" (safe to start saving) from "the query failed" (saving would overwrite a
+ * trip that exists in the DB with empty local state).
+ */
+/**
+ * Cheap "has anything changed?" probe: one row, two columns.
+ * Realtime is the fast path for cross-device sync, but it only works if the tables are
+ * in the supabase_realtime publication. Polling this stamp makes sync work regardless.
+ */
+export async function fetchLatestTripStamp(): Promise<string | null> {
+  if (!supabase) return null;
+  try {
+    const { data, error } = await supabase
+      .from('trips')
+      .select('id, updated_at')
+      .order('updated_at', { ascending: false })
+      .limit(1);
+
+    if (error || !data || data.length === 0) return null;
+    return `${data[0].id}__${data[0].updated_at}`;
+  } catch {
+    return null;
+  }
+}
+
+export type LatestTripResult =
+  | { status: 'loaded'; payload: SavedTripPayload }
+  | { status: 'empty' }
+  | { status: 'error'; message: string };
+
+/**
  * Fetch the single most recently updated trip state from Supabase
  */
-export async function fetchLatestTripFromSupabase(): Promise<SavedTripPayload | null> {
-  if (!supabase) return null;
+export async function fetchLatestTripFromSupabase(): Promise<LatestTripResult> {
+  if (!supabase) return { status: 'error', message: 'Supabase 미설정' };
   try {
     const { data: latestTrips, error } = await supabase
       .from('trips')
@@ -330,11 +364,17 @@ export async function fetchLatestTripFromSupabase(): Promise<SavedTripPayload | 
       .order('updated_at', { ascending: false })
       .limit(1);
 
-    if (error || !latestTrips || latestTrips.length === 0) return null;
-    return await loadTripFromSupabase(latestTrips[0].id);
-  } catch (e) {
+    if (error) return { status: 'error', message: error.message };
+    if (!latestTrips || latestTrips.length === 0) return { status: 'empty' };
+
+    const payload = await loadTripFromSupabase(latestTrips[0].id);
+    if (!payload) {
+      return { status: 'error', message: '여행 상세 조회 실패' };
+    }
+    return { status: 'loaded', payload };
+  } catch (e: any) {
     console.warn('[Supabase] fetchLatestTripFromSupabase exception caught:', e);
-    return null;
+    return { status: 'error', message: e?.message || String(e) };
   }
 }
 
@@ -391,7 +431,15 @@ export function subscribeToTripChanges(
         { event: '*', schema: 'public', table: 'day_itineraries' },
         handleChange
       )
-      .subscribe();
+      .subscribe((status, err) => {
+        // Without this callback a failed subscription is completely silent, and
+        // cross-device sync just never happens with no way to tell why.
+        if (status === 'SUBSCRIBED') {
+          console.log('🔗 [실시간 동기화 연결됨]');
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          console.warn(`⚠️ [실시간 동기화 ${status}]`, err?.message || '');
+        }
+      });
 
     return () => {
       try {

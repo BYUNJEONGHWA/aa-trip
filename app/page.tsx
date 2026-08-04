@@ -18,8 +18,10 @@ import {
   fetchAllTripsFromSupabase,
   loadTripFromSupabase,
   fetchLatestTripFromSupabase,
+  fetchLatestTripStamp,
   subscribeToTripChanges,
   saveTripToSupabase,
+  isSelfWriting,
 } from '@/lib/supabase';
 import {
   DndContext,
@@ -59,6 +61,10 @@ export default function Home() {
   const [mapViewState, setMapViewState] = useState<'NORMAL' | 'MINIMIZED' | 'MAXIMIZED'>('NORMAL');
   const [mobileActiveView, setMobileActiveView] = useState<'PLACES' | 'SCHEDULER' | 'MAP'>('SCHEDULER');
 
+  // Last trip stamp (id + updated_at) this tab has synced to, used by the poller below
+  const lastSeenStampRef = React.useRef<string | null>(null);
+  const reloadFromDbRef = React.useRef<null | (() => Promise<void>)>(null);
+
   // Auto-sync / load latest real trip and places from Supabase on mount
   useEffect(() => {
     let isMounted = true;
@@ -71,29 +77,47 @@ export default function Home() {
       }
       try {
         // Always load the most recently updated trip across devices
-        const loaded = await fetchLatestTripFromSupabase();
-        if (loaded && isMounted) {
-          setActiveTrip?.(loaded?.tripId, loaded?.title);
+        const result = await fetchLatestTripFromSupabase();
+        if (!isMounted) return;
+
+        // Remember what we just synced to, so the poller only reloads on NEW changes
+        lastSeenStampRef.current = await fetchLatestTripStamp();
+
+        if (result.status === 'loaded') {
+          const loaded = result.payload;
+          // This state came from the DB — don't let the auto-save effect write it back.
+          skipNextAutoSaveRef.current = true;
+          setActiveTrip?.(loaded.tripId, loaded.title);
           loadFullTripState?.({
-            tripId: loaded?.tripId,
-            title: loaded?.title,
-            startDate: loaded?.startDate || '2026-08-16',
-            dayCount: loaded?.dayCount || 3,
-            places: loaded?.places || [],
-            scheduledPlaces: loaded?.scheduledPlaces || [],
-            dayItineraries: loaded?.dayItineraries || [],
+            tripId: loaded.tripId,
+            title: loaded.title,
+            startDate: loaded.startDate || '2026-08-16',
+            dayCount: loaded.dayCount || 3,
+            places: loaded.places || [],
+            scheduledPlaces: loaded.scheduledPlaces || [],
+            dayItineraries: loaded.dayItineraries || [],
           });
+          // Local state now mirrors the DB, so arming auto-save is safe.
+          setIsDbInitialLoaded(true);
+        } else if (result.status === 'empty') {
+          // No trip exists yet — nothing to overwrite, so a first-time user can save.
+          setIsDbInitialLoaded(true);
+        } else {
+          // The load FAILED. Local state here is the empty default; saving it would
+          // DELETE every row of a trip that does exist in the DB. Leave auto-save
+          // disarmed — a read-only tab is the safe failure mode, silent data loss is not.
+          console.error('❌ [DB 불러오기 실패]: 자동저장을 중단합니다 (기존 데이터 보호).', result.message);
+          setAutoSaveStatus('error');
         }
       } catch (e) {
-        console.warn('Auto load from Supabase failed:', e);
-      } finally {
-        if (isMounted) {
-          setIsDbInitialLoaded(true);
-        }
+        // Same reasoning: never arm auto-save after a failed load.
+        console.error('❌ [DB 불러오기 예외]: 자동저장을 중단합니다 (기존 데이터 보호).', e);
+        if (isMounted) setAutoSaveStatus('error');
       }
     }
 
     autoLoadFromSupabase();
+    reloadFromDbRef.current = autoLoadFromSupabase;
 
     // Subscribe to Supabase Realtime changes across devices
     let unsubscribe: any = null;
@@ -122,36 +146,51 @@ export default function Home() {
     };
   }, []);
 
-  // Debounced Auto-Save Effect: Auto save to Supabase whenever places, schedules, notes, or dates change
-  const isFirstAutoSaveRun = React.useRef(true);
+  // Auto-Save: push every change to Supabase immediately so any device that opens the
+  // site sees it right away. Kept just long enough to coalesce a burst of keystrokes
+  // into one write; saves are serialized in lib/supabase.ts so they cannot interleave.
+  const AUTO_SAVE_DELAY_MS = 150;
+
+  // Set before every loadFullTripState from the DB. State that came FROM the database
+  // must not be written straight back to it: with realtime sync that echo would make two
+  // open devices save to each other forever (A saves -> B reloads -> B saves -> A
+  // reloads -> ...). Also covers the very first load, hence the initial `true`.
+  const skipNextAutoSaveRef = React.useRef(true);
+
+  // Latest payload, so a save can be flushed on tab hide without waiting for the timer
+  const pendingSaveRef = React.useRef<any>(null);
 
   useEffect(() => {
     if (!isDbInitialLoaded || !isSupabaseConfigured()) return;
 
-    if (isFirstAutoSaveRun.current) {
-      isFirstAutoSaveRun.current = false;
+    if (skipNextAutoSaveRef.current) {
+      skipNextAutoSaveRef.current = false;
       return;
     }
+
+    const payload = {
+      tripId: activeTripId || 'aa_trip_main',
+      title: activeTripTitle || '스마트 여행 일정',
+      startDate,
+      dayCount,
+      places,
+      scheduledPlaces,
+      dayItineraries,
+    };
+    pendingSaveRef.current = payload;
 
     setAutoSaveStatus('saving');
     const timer = setTimeout(async () => {
       try {
-        await saveTripToSupabase({
-          tripId: activeTripId || 'aa_trip_main',
-          title: activeTripTitle || '스마트 여행 일정',
-          startDate,
-          dayCount,
-          places,
-          scheduledPlaces,
-          dayItineraries,
-        });
+        await saveTripToSupabase(payload);
+        if (pendingSaveRef.current === payload) pendingSaveRef.current = null;
         setAutoSaveStatus('saved');
         setTimeout(() => setAutoSaveStatus('idle'), 3000);
       } catch (err) {
         console.warn('Auto save error:', err);
         setAutoSaveStatus('error');
       }
-    }, 1000);
+    }, AUTO_SAVE_DELAY_MS);
 
     return () => clearTimeout(timer);
   }, [
@@ -165,6 +204,70 @@ export default function Home() {
     isDbInitialLoaded,
     setAutoSaveStatus,
   ]);
+
+  // Cross-device sync fallback. Realtime is the fast path, but it only delivers events
+  // if the tables are in the supabase_realtime publication — if they are not, sync fails
+  // silently. Polling a one-row stamp guarantees another device's change shows up here
+  // within a few seconds either way.
+  useEffect(() => {
+    if (!isDbInitialLoaded || !isSupabaseConfigured()) return;
+
+    let cancelled = false;
+
+    const check = async () => {
+      if (cancelled || document.visibilityState === 'hidden') return;
+      // Skip while our own write is in flight: the stamp would be ours, not a peer's.
+      if (isSelfWriting()) return;
+
+      const stamp = await fetchLatestTripStamp();
+      if (cancelled || !stamp) return;
+
+      if (lastSeenStampRef.current && stamp !== lastSeenStampRef.current) {
+        lastSeenStampRef.current = stamp;
+        await reloadFromDbRef.current?.();
+      } else if (!lastSeenStampRef.current) {
+        lastSeenStampRef.current = stamp;
+      }
+    };
+
+    const timer = setInterval(check, 4000);
+    // Also check the moment the tab is brought back into focus
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') check();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [isDbInitialLoaded]);
+
+  // Flush a pending save when the tab is hidden or closed. Without this, closing the tab
+  // (or switching apps on mobile) within the debounce window drops the last change, and
+  // another device would never see it.
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+
+    const flush = () => {
+      const payload = pendingSaveRef.current;
+      if (!payload || !isSupabaseConfigured()) return;
+      pendingSaveRef.current = null;
+      saveTripToSupabase(payload).catch((e) => console.warn('Flush save error:', e));
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') flush();
+    };
+
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('pagehide', flush);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('pagehide', flush);
+    };
+  }, []);
 
   // Seamless automatic background update of place operating hours
   useEffect(() => {

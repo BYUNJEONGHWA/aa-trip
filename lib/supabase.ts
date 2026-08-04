@@ -140,7 +140,11 @@ async function writeTripRows(payload: SavedTripPayload) {
   }
 
   // 3. Delete existing schedules for this trip & insert new schedules
-  await supabase.from('scheduled_places').delete().eq('trip_id', tripId);
+  const { error: schedDeleteErr } = await supabase.from('scheduled_places').delete().eq('trip_id', tripId);
+  if (schedDeleteErr) {
+    console.error('❌ [DB 기존 일정 삭제 실패]:', schedDeleteErr.message);
+    throw schedDeleteErr;
+  }
 
   if (scheduledPlaces.length > 0) {
     const scheduledData = scheduledPlaces.map((s) => ({
@@ -159,7 +163,11 @@ async function writeTripRows(payload: SavedTripPayload) {
   }
 
   // 4. Save Day Notes
-  await supabase.from('day_itineraries').delete().eq('trip_id', tripId);
+  const { error: notesDeleteErr } = await supabase.from('day_itineraries').delete().eq('trip_id', tripId);
+  if (notesDeleteErr) {
+    console.error('❌ [DB 기존 메모 삭제 실패]:', notesDeleteErr.message);
+    throw notesDeleteErr;
+  }
   if (dayItineraries.length > 0) {
     const notesData = dayItineraries.map((it) => ({
       trip_id: tripId,
@@ -330,23 +338,39 @@ export async function fetchLatestTripFromSupabase(): Promise<SavedTripPayload | 
   }
 }
 
+let realtimeChannelSeq = 0;
+
+interface SubscribeOptions {
+  /**
+   * Skip events caused by this client's own save. Set for subscribers that RELOAD trip
+   * state: without it every save echoes back as a change event -> reload -> new state ->
+   * another save, and those overlapping saves are what duplicated the schedule rows.
+   * Leave false for read-only subscribers (e.g. refreshing the trip list), which need to
+   * see our own writes and cannot start a save loop.
+   */
+  ignoreSelfWrites?: boolean;
+}
+
 /**
  * Subscribe to real-time database changes across devices for instant sync
  */
-export function subscribeToTripChanges(onRealtimeChange: () => void) {
+export function subscribeToTripChanges(
+  onRealtimeChange: () => void,
+  { ignoreSelfWrites = false }: SubscribeOptions = {}
+) {
   if (!supabase || typeof window === 'undefined') return () => {};
 
-  // Ignore the change events our own save just produced. Without this, every save
-  // echoes back as a realtime event -> reload -> state change -> another save, and
-  // those overlapping saves are what duplicated the schedule rows.
   const handleChange = () => {
-    if (isSelfWriting()) return;
+    if (ignoreSelfWrites && isSelfWriting()) return;
     try { onRealtimeChange(); } catch (err) { console.warn('Realtime callback err:', err); }
   };
 
   try {
+    // Unique per subscriber: two subscribers sharing one channel name clobber each
+    // other when either unsubscribes via removeChannel.
+    realtimeChannelSeq++;
     const channel = supabase
-      .channel('aa-trip-realtime-channel')
+      .channel(`aa-trip-realtime-channel-${realtimeChannelSeq}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'trips' },

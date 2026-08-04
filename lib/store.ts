@@ -3,7 +3,6 @@ import { persist } from 'zustand/middleware';
 import { addDays, format, parseISO } from 'date-fns';
 import { DayItinerary, DayOffFilter, DayOfWeek, Place, ScheduledPlace } from './types';
 import { optimizeRouteOrder } from './routeOptimizer';
-import { isSupabaseConfigured, saveTripToSupabase } from './supabase';
 
 const WEEKDAYS: DayOfWeek[] = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const KOREAN_WEEKDAYS: Record<DayOfWeek, string> = {
@@ -60,7 +59,6 @@ interface AppState {
 
   addPlaceToDay: (placeId: string, dayIndex: number) => void;
   removeScheduledPlace: (scheduleId: string) => void;
-  dedupeScheduledPlaces: () => number;
   reorderDaySchedule: (dayIndex: number, activeScheduleId: string, overScheduleId: string) => void;
   moveScheduleToDay: (scheduleId: string, targetDayIndex: number) => void;
 
@@ -283,37 +281,6 @@ export const useAppStore = create<AppState>()(
           }));
         },
 
-        // Safety net for schedule rows duplicated by an interleaved Supabase save.
-        // Keys on scheduleId, which is minted once per addPlaceToDay call: two entries
-        // sharing one are always the same entry written twice, so this never removes a
-        // place the user deliberately scheduled twice. Returns how many were removed.
-        dedupeScheduledPlaces: () => {
-          const state = get();
-          const seen = new Set<string>();
-          const kept: ScheduledPlace[] = [];
-
-          [...state.scheduledPlaces]
-            .sort((a, b) => a.dayIndex - b.dayIndex || a.order - b.order)
-            .forEach((s) => {
-              if (seen.has(s.scheduleId)) return;
-              seen.add(s.scheduleId);
-              kept.push(s);
-            });
-
-          const removedCount = state.scheduledPlaces.length - kept.length;
-          if (removedCount === 0) return 0;
-
-          const orderCounters: Record<number, number> = {};
-          const reindexed = kept.map((s) => {
-            const nextOrder = orderCounters[s.dayIndex] ?? 0;
-            orderCounters[s.dayIndex] = nextOrder + 1;
-            return { ...s, order: nextOrder };
-          });
-
-          set({ scheduledPlaces: reindexed });
-          return removedCount;
-        },
-
         reorderDaySchedule: (dayIndex, activeScheduleId, overScheduleId) => {
           set((state) => {
             const daySchedules = state.scheduledPlaces
@@ -387,19 +354,10 @@ export const useAppStore = create<AppState>()(
               it.dayIndex === dayIndex ? { ...it, notes } : it
             );
 
-            // Auto-sync notes to Supabase if configured
-            if (isSupabaseConfigured()) {
-              saveTripToSupabase({
-                tripId: state.activeTripId,
-                title: state.activeTripTitle,
-                startDate: state.startDate,
-                dayCount: state.dayCount,
-                places: state.places,
-                scheduledPlaces: state.scheduledPlaces,
-                dayItineraries: updatedItineraries,
-              }).catch((e) => console.warn('Auto sync notes warn:', e));
-            }
-
+            // No save here. This fired one un-debounced, un-awaited full trip save PER
+            // KEYSTROKE, on top of the debounced auto-save in app/page.tsx that already
+            // watches dayItineraries — two writers racing the same non-atomic
+            // DELETE-then-INSERT. Returning the new state is enough to trigger that saver.
             return { dayItineraries: updatedItineraries };
           });
         },

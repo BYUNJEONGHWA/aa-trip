@@ -26,6 +26,8 @@ export default function TripFolderTabs() {
     isDbInitialLoaded,
     setIsDbInitialLoaded,
     loadFullTripState,
+    autoSaveStatus,
+    setAutoSaveStatus,
   } = useAppStore();
 
   const [trips, setTrips] = useState<any[]>([]);
@@ -36,7 +38,7 @@ export default function TripFolderTabs() {
   const [editingTripId, setEditingTripId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
 
-  const [autoSaveStatus, setAutoSaveStatus] = useState<'saved' | 'saving' | 'idle' | 'error'>('saved');
+  // autoSaveStatus comes from the store, written by the single auto-saver in app/page.tsx
 
   // Fetch all trips from Supabase DB on mount or when activeTripId changes
   const loadTripsList = async () => {
@@ -77,32 +79,13 @@ export default function TripFolderTabs() {
     };
   }, [activeTripId]);
 
-  // Debounced Real-time Auto-Save to Supabase DB (Guards for race condition prevention)
-  useEffect(() => {
-    if (!isSupabaseConfigured() || !isDbInitialLoaded) return;
-
-    setAutoSaveStatus('saving');
-    const timer = setTimeout(async () => {
-      try {
-        await saveTripToSupabase({
-          tripId: activeTripId,
-          title: activeTripTitle || '스마트 여행',
-          startDate,
-          dayCount,
-          places,
-          scheduledPlaces,
-          dayItineraries,
-        });
-        setAutoSaveStatus('saved');
-        loadTripsList();
-      } catch (e: any) {
-        console.error('❌ [Auto Save Error]:', e);
-        setAutoSaveStatus('error');
-      }
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [places, scheduledPlaces, dayItineraries, startDate, dayCount, activeTripId, activeTripTitle, isDbInitialLoaded]);
+  // NOTE: this component used to run its OWN debounced auto-save (300ms) with the same
+  // payload and deps as the one in app/page.tsx (1000ms) — two savers firing per state
+  // change, ~700ms apart. Each save is a non-atomic DELETE-then-INSERT of the whole
+  // trip, so the two racing each other duplicated every schedule row. It also lacked
+  // page.tsx's first-run guard, so it wrote back state it had just loaded.
+  // app/page.tsx is now the single auto-saver; it updates autoSaveStatus for the badge
+  // below. Saves are additionally serialized in lib/supabase.ts.
 
   // Switch Active Trip Folder with isolated places/schedules
   const handleSelectTrip = async (trip: any) => {

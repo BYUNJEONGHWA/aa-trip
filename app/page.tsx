@@ -99,11 +99,16 @@ export default function Home() {
     let unsubscribe: any = null;
     if (isSupabaseConfigured()) {
       try {
-        unsubscribe = subscribeToTripChanges(() => {
-          if (isMounted) {
-            autoLoadFromSupabase();
-          }
-        });
+        // ignoreSelfWrites: this handler reloads trip state, so reacting to our own
+        // save would re-trigger the auto-save effect and race the next save.
+        unsubscribe = subscribeToTripChanges(
+          () => {
+            if (isMounted) {
+              autoLoadFromSupabase();
+            }
+          },
+          { ignoreSelfWrites: true }
+        );
       } catch (e) {
         console.warn('Realtime subscription setup failed:', e);
       }

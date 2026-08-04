@@ -45,12 +45,59 @@ export async function updateTripTitleInSupabase(tripId: string, title: string) {
 }
 
 /**
- * Save current trip & places state to Supabase
+ * Serializes saves. saveTripToSupabase is "DELETE all rows for this trip, then INSERT
+ * the current set" — which is only correct if it never interleaves with itself. Two
+ * concurrent saves run as DELETE, DELETE, INSERT, INSERT and leave EVERY schedule row
+ * duplicated. (That is exactly how the schedule ended up with 8 rows / 4 schedule_ids.)
+ * Concurrent callers are real: the debounced auto-save in app/page.tsx, the direct save
+ * in store.updateDayNotes, and the realtime handler all fire independently.
+ */
+let saveChain: Promise<any> = Promise.resolve();
+
+/**
+ * Set while our own write is in flight, so the realtime subscription can ignore the
+ * change events our own save produces instead of reloading and re-triggering a save.
+ */
+let selfWriteDepth = 0;
+let lastSelfWriteEndedAt = 0;
+// Change events lag the write that caused them, so keep ignoring them briefly after
+// the save finishes — otherwise a late echo still restarts the reload/save loop.
+const SELF_WRITE_ECHO_GRACE_MS = 2000;
+export const isSelfWriting = () =>
+  selfWriteDepth > 0 || Date.now() - lastSelfWriteEndedAt < SELF_WRITE_ECHO_GRACE_MS;
+
+/**
+ * Save current trip & places state to Supabase.
+ * Calls are queued so a save never overlaps another save.
  */
 export async function saveTripToSupabase(payload: SavedTripPayload) {
   if (!supabase) {
     throw new Error('Supabase URL 및 Anon Key가 설정되지 않았습니다. .env.local 설정이 필요합니다.');
   }
+
+  const run = saveChain.then(
+    () => performSaveTripToSupabase(payload),
+    () => performSaveTripToSupabase(payload)
+  );
+  // Keep the chain alive even if this save rejects, so later saves still run.
+  saveChain = run.catch(() => {});
+  return run;
+}
+
+async function performSaveTripToSupabase(payload: SavedTripPayload) {
+  if (!supabase) throw new Error('Supabase 미설정');
+
+  selfWriteDepth++;
+  try {
+    return await writeTripRows(payload);
+  } finally {
+    selfWriteDepth--;
+    lastSelfWriteEndedAt = Date.now();
+  }
+}
+
+async function writeTripRows(payload: SavedTripPayload) {
+  if (!supabase) throw new Error('Supabase 미설정');
 
   const { tripId, title, startDate, dayCount, places, scheduledPlaces, dayItineraries } = payload;
 
@@ -167,12 +214,33 @@ export async function loadTripFromSupabase(tripId: string): Promise<SavedTripPay
     .eq('trip_id', tripId)
     .order('order_index', { ascending: true });
 
-  const scheduledPlaces: ScheduledPlace[] = (schedData || []).map((s: any) => ({
-    scheduleId: s.schedule_id || `sched_${s.id}`,
-    placeId: s.place_id,
-    dayIndex: s.day_index,
-    order: s.order_index,
-  }));
+  // Collapse rows that share a schedule_id. A schedule_id is minted once per
+  // addPlaceToDay call, so two rows carrying the same one are always the SAME entry
+  // written twice by an interleaved save — never a place the user deliberately
+  // scheduled twice (that would carry two different schedule_ids). Deduping here
+  // heals already-corrupted data on load; the next save then persists the clean set.
+  const seenScheduleIds = new Set<string>();
+  const scheduledPlaces: ScheduledPlace[] = [];
+  let duplicateRowCount = 0;
+
+  (schedData || []).forEach((s: any) => {
+    const scheduleId = s.schedule_id || `sched_${s.id}`;
+    if (seenScheduleIds.has(scheduleId)) {
+      duplicateRowCount++;
+      return;
+    }
+    seenScheduleIds.add(scheduleId);
+    scheduledPlaces.push({
+      scheduleId,
+      placeId: s.place_id,
+      dayIndex: s.day_index,
+      order: s.order_index,
+    });
+  });
+
+  if (duplicateRowCount > 0) {
+    console.warn(`⚠️ [DB 중복 일정 ${duplicateRowCount}건 무시]: 동일 schedule_id 중복 행을 제거했습니다.`);
+  }
 
   // 4. Fetch Day Notes
   const { data: daysData } = await supabase.from('day_itineraries').select('*').eq('trip_id', tripId);
@@ -268,36 +336,36 @@ export async function fetchLatestTripFromSupabase(): Promise<SavedTripPayload | 
 export function subscribeToTripChanges(onRealtimeChange: () => void) {
   if (!supabase || typeof window === 'undefined') return () => {};
 
+  // Ignore the change events our own save just produced. Without this, every save
+  // echoes back as a realtime event -> reload -> state change -> another save, and
+  // those overlapping saves are what duplicated the schedule rows.
+  const handleChange = () => {
+    if (isSelfWriting()) return;
+    try { onRealtimeChange(); } catch (err) { console.warn('Realtime callback err:', err); }
+  };
+
   try {
     const channel = supabase
       .channel('aa-trip-realtime-channel')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'trips' },
-        () => {
-          try { onRealtimeChange(); } catch (err) { console.warn('Realtime callback err:', err); }
-        }
+        handleChange
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'places' },
-        () => {
-          try { onRealtimeChange(); } catch (err) { console.warn('Realtime callback err:', err); }
-        }
+        handleChange
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'scheduled_places' },
-        () => {
-          try { onRealtimeChange(); } catch (err) { console.warn('Realtime callback err:', err); }
-        }
+        handleChange
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'day_itineraries' },
-        () => {
-          try { onRealtimeChange(); } catch (err) { console.warn('Realtime callback err:', err); }
-        }
+        handleChange
       )
       .subscribe();
 

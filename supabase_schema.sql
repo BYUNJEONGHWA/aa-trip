@@ -59,6 +59,25 @@ CREATE TABLE IF NOT EXISTS public.day_itineraries (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- 4-1. De-duplicate & lock out duplicate rows
+-- A save is "DELETE this trip's rows, then INSERT the current set". Two saves that
+-- interleave (DELETE, DELETE, INSERT, INSERT) leave EVERY schedule row duplicated.
+-- The app now serializes saves, but these unique indexes make duplication impossible
+-- even across devices/tabs. Existing duplicates are cleared first so the index builds.
+DELETE FROM public.scheduled_places a
+  USING public.scheduled_places b
+  WHERE a.id > b.id AND a.trip_id = b.trip_id AND a.schedule_id = b.schedule_id;
+
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_scheduled_places_trip_schedule
+    ON public.scheduled_places(trip_id, schedule_id);
+
+DELETE FROM public.day_itineraries a
+  USING public.day_itineraries b
+  WHERE a.id > b.id AND a.trip_id = b.trip_id AND a.day_index = b.day_index;
+
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_day_itineraries_trip_day
+    ON public.day_itineraries(trip_id, day_index);
+
 -- 5. Enable Row Level Security (RLS) & Set Public Access Policies
 ALTER TABLE public.trips ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.places ENABLE ROW LEVEL SECURITY;

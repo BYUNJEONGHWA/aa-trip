@@ -283,9 +283,10 @@ export const useAppStore = create<AppState>()(
           }));
         },
 
-        // One-shot cleanup for schedules duplicated by the old double-firing add paths.
-        // Keeps the first occurrence of each (dayIndex, placeId) pair and re-numbers order.
-        // Returns how many entries were removed.
+        // Safety net for schedule rows duplicated by an interleaved Supabase save.
+        // Keys on scheduleId, which is minted once per addPlaceToDay call: two entries
+        // sharing one are always the same entry written twice, so this never removes a
+        // place the user deliberately scheduled twice. Returns how many were removed.
         dedupeScheduledPlaces: () => {
           const state = get();
           const seen = new Set<string>();
@@ -294,9 +295,8 @@ export const useAppStore = create<AppState>()(
           [...state.scheduledPlaces]
             .sort((a, b) => a.dayIndex - b.dayIndex || a.order - b.order)
             .forEach((s) => {
-              const key = `${s.dayIndex}__${s.placeId}`;
-              if (seen.has(key)) return;
-              seen.add(key);
+              if (seen.has(s.scheduleId)) return;
+              seen.add(s.scheduleId);
               kept.push(s);
             });
 
@@ -427,13 +427,23 @@ export const useAppStore = create<AppState>()(
           }
 
           const newItineraries = buildDayItineraries(startDate, dayCount, notesMap);
+
+          // Drop schedule entries sharing a scheduleId (same row written twice by an
+          // interleaved save) so corrupted data never reaches the UI.
+          const seenScheduleIds = new Set<string>();
+          const cleanSchedules = (scheduledPlaces || []).filter((s) => {
+            if (!s || seenScheduleIds.has(s.scheduleId)) return false;
+            seenScheduleIds.add(s.scheduleId);
+            return true;
+          });
+
           set({
             ...(tripId ? { activeTripId: tripId } : {}),
             ...(title ? { activeTripTitle: title } : {}),
             startDate,
             dayCount,
             places: places || [],
-            scheduledPlaces: scheduledPlaces || [],
+            scheduledPlaces: cleanSchedules,
             dayItineraries: newItineraries,
             activeDayIndex: 0,
           });

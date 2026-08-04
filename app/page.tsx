@@ -385,10 +385,10 @@ export default function Home() {
       const sourceDayIndex = activeSchedule.dayIndex;
 
       if (overData?.type === 'DAY_COLUMN') {
-        const targetDayIndex = overData.dayIndex;
-        if (sourceDayIndex !== targetDayIndex) {
-          moveScheduleToDay(activeScheduleId, targetDayIndex);
-        }
+        // Dropped on the column itself rather than a specific card (e.g. empty space
+        // below the last card, now that the list can grow past the visible area) -
+        // moveScheduleToDay handles the same-day case fine, placing it at the end.
+        moveScheduleToDay(activeScheduleId, overData.dayIndex);
       } else if (overData?.type === 'SCHEDULED_PLACE') {
         const overSchedule = overData.scheduledPlace;
         const targetDayIndex = overSchedule.dayIndex;

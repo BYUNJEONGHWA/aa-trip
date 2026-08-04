@@ -148,13 +148,13 @@ async function writeTripRows(payload: SavedTripPayload) {
     }
   }
 
-  // 3. Delete existing schedules for this trip & insert new schedules
-  const { error: schedDeleteErr } = await supabase.from('scheduled_places').delete().eq('trip_id', tripId);
-  if (schedDeleteErr) {
-    console.error('❌ [DB 기존 일정 삭제 실패]:', schedDeleteErr.message);
-    throw schedDeleteErr;
-  }
-
+  // 3. Upsert schedules, then prune rows no longer present.
+  // This used to be DELETE-then-INSERT, which briefly leaves the table with zero rows
+  // for this trip. Any concurrent client reading in that gap (poller, realtime reload,
+  // another tab) would see an empty schedule and — if it later saved — write that empty
+  // state back, wiping everyone's schedule. Upserting removes the empty-table window
+  // entirely; the only remaining delete targets rows whose schedule_id genuinely isn't
+  // in the current set (items the user actually removed).
   if (scheduledPlaces.length > 0) {
     const scheduledData = scheduledPlaces.map((s) => ({
       trip_id: tripId,
@@ -166,19 +166,34 @@ async function writeTripRows(payload: SavedTripPayload) {
       break_label: s.breakLabel || null,
     }));
 
-    const { error: schedError } = await supabase.from('scheduled_places').insert(scheduledData);
+    const { error: schedError } = await supabase
+      .from('scheduled_places')
+      .upsert(scheduledData, { onConflict: 'trip_id,schedule_id' });
     if (schedError) {
       console.error('❌ [DB 일정 저장 실패]:', schedError.message);
       throw schedError;
     }
+
+    const currentScheduleIds = scheduledPlaces.map((s) => s.scheduleId).join(',');
+    const { error: schedPruneErr } = await supabase
+      .from('scheduled_places')
+      .delete()
+      .eq('trip_id', tripId)
+      .not('schedule_id', 'in', `(${currentScheduleIds})`);
+    if (schedPruneErr) {
+      console.error('❌ [DB 일정 정리 실패]:', schedPruneErr.message);
+    }
+  } else {
+    const { error: schedClearErr } = await supabase.from('scheduled_places').delete().eq('trip_id', tripId);
+    if (schedClearErr) {
+      console.error('❌ [DB 일정 비우기 실패]:', schedClearErr.message);
+      throw schedClearErr;
+    }
   }
 
-  // 4. Save Day Notes
-  const { error: notesDeleteErr } = await supabase.from('day_itineraries').delete().eq('trip_id', tripId);
-  if (notesDeleteErr) {
-    console.error('❌ [DB 기존 메모 삭제 실패]:', notesDeleteErr.message);
-    throw notesDeleteErr;
-  }
+  // 4. Save Day Notes — same upsert-then-prune reasoning as schedules above. This is the
+  // pattern that most recently wiped every day's notes: a client's read landed in the
+  // empty gap between the old delete and insert, then saved that empty snapshot back.
   if (dayItineraries.length > 0) {
     const notesData = dayItineraries.map((it) => ({
       trip_id: tripId,
@@ -186,10 +201,27 @@ async function writeTripRows(payload: SavedTripPayload) {
       date_str: it.dateStr,
       notes: it.notes || '',
     }));
-    const { error: notesErr } = await supabase.from('day_itineraries').insert(notesData);
+    const { error: notesErr } = await supabase
+      .from('day_itineraries')
+      .upsert(notesData, { onConflict: 'trip_id,day_index' });
     if (notesErr) {
       console.error('❌ [DB 메모 저장 실패]:', notesErr.message);
       throw notesErr;
+    }
+
+    const { error: notesPruneErr } = await supabase
+      .from('day_itineraries')
+      .delete()
+      .eq('trip_id', tripId)
+      .gte('day_index', dayItineraries.length);
+    if (notesPruneErr) {
+      console.error('❌ [DB 메모 정리 실패]:', notesPruneErr.message);
+    }
+  } else {
+    const { error: notesClearErr } = await supabase.from('day_itineraries').delete().eq('trip_id', tripId);
+    if (notesClearErr) {
+      console.error('❌ [DB 메모 비우기 실패]:', notesClearErr.message);
+      throw notesClearErr;
     }
   }
 

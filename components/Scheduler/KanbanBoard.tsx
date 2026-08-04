@@ -77,48 +77,47 @@ export default function KanbanBoard() {
       {/* Main Kanban Content Container */}
       {/* Mobile (< 768px): Vertical Stack or Selected Single Day with Full Mobile Scroll */}
       {/* Desktop (>= 768px): Side-by-Side Horizontal Scrollable Board */}
+      {/*
+        Each DayColumn is mounted exactly once. It used to be rendered twice - once in a
+        mobile-only block and again in a desktop-only block hidden via `hidden md:flex` -
+        which still mounts both on every screen size (`display:none` doesn't unmount).
+        Two DayColumn instances for the same day means two sets of dnd-kit
+        useSortable/useDroppable registrations for the same scheduleIds, and whichever one
+        dnd-kit resolved a hit-test against determined whether a drag actually reordered
+        anything - explaining why it worked for some days and not others. Each day's
+        wrapper below uses `contents` (invisible to layout, passes DayColumn's own sizing
+        straight through) when it should show, or `hidden md:contents` when it should only
+        show at the desktop breakpoint.
+      */}
       <div className="w-full flex-1 md:min-h-0 overflow-x-hidden md:overflow-x-auto md:overflow-y-hidden p-3 sm:p-4 flex flex-col md:flex-row gap-4 items-start pb-24 md:pb-6 touch-pan-y">
-        {/* Mobile Single View mode */}
-        <div className="md:hidden w-full space-y-4">
-          {mobileViewMode === 'SINGLE' ? (
-            dayItineraries
-              .filter((it) => it.dayIndex === activeDayIndex)
-              .map((itinerary) => (
-                <DayColumn key={itinerary.dayIndex} itinerary={itinerary} />
-              ))
-          ) : (
-            dayItineraries.map((itinerary) => (
-              <DayColumn key={itinerary.dayIndex} itinerary={itinerary} />
-            ))
-          )}
-
-          {/* Add Day Card on Mobile */}
-          <button
-            onClick={addDay}
-            className="w-full py-4 border-2 border-dashed border-emerald-300 hover:border-emerald-500 rounded-2xl flex items-center justify-center gap-2 text-emerald-700 bg-emerald-50/60 hover:bg-emerald-100/60 transition-all cursor-pointer shadow-2xs font-black text-xs min-h-[52px]"
-          >
-            <Plus className="w-4 h-4 text-emerald-600 stroke-[3]" />
-            <span>+ 새로운 일차 추가하기 (DAY {dayItineraries.length + 1})</span>
-          </button>
-        </div>
-
-        {/* Desktop Side-by-Side View (>= 768px) */}
-        <div className="hidden md:flex gap-4 items-start h-full w-full">
-          {dayItineraries.map((itinerary) => (
-            <DayColumn key={itinerary.dayIndex} itinerary={itinerary} />
-          ))}
-
-          {/* Add Day Card on Desktop */}
-          <button
-            onClick={addDay}
-            className="w-48 h-32 shrink-0 border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl flex flex-col items-center justify-center gap-2 text-slate-500 hover:text-emerald-700 bg-white hover:bg-emerald-50/50 transition-all cursor-pointer group shadow-xs"
-          >
-            <div className="w-8 h-8 rounded-full bg-slate-100 group-hover:bg-emerald-100 flex items-center justify-center transition-all">
-              <Plus className="w-5 h-5 text-slate-500 group-hover:text-emerald-600" />
+        {dayItineraries.map((itinerary) => {
+          const showOnMobile = mobileViewMode === 'STACKED' || itinerary.dayIndex === activeDayIndex;
+          return (
+            <div key={itinerary.dayIndex} className={showOnMobile ? 'contents' : 'hidden md:contents'}>
+              <DayColumn itinerary={itinerary} />
             </div>
-            <span className="text-xs font-bold">일차 추가하기</span>
-          </button>
-        </div>
+          );
+        })}
+
+        {/* Add Day Card on Mobile */}
+        <button
+          onClick={addDay}
+          className="md:hidden w-full py-4 border-2 border-dashed border-emerald-300 hover:border-emerald-500 rounded-2xl flex items-center justify-center gap-2 text-emerald-700 bg-emerald-50/60 hover:bg-emerald-100/60 transition-all cursor-pointer shadow-2xs font-black text-xs min-h-[52px]"
+        >
+          <Plus className="w-4 h-4 text-emerald-600 stroke-[3]" />
+          <span>+ 새로운 일차 추가하기 (DAY {dayItineraries.length + 1})</span>
+        </button>
+
+        {/* Add Day Card on Desktop */}
+        <button
+          onClick={addDay}
+          className="hidden md:flex w-48 h-32 shrink-0 border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl flex-col items-center justify-center gap-2 text-slate-500 hover:text-emerald-700 bg-white hover:bg-emerald-50/50 transition-all cursor-pointer group shadow-xs"
+        >
+          <div className="w-8 h-8 rounded-full bg-slate-100 group-hover:bg-emerald-100 flex items-center justify-center transition-all">
+            <Plus className="w-5 h-5 text-slate-500 group-hover:text-emerald-600" />
+          </div>
+          <span className="text-xs font-bold">일차 추가하기</span>
+        </button>
       </div>
     </div>
   );

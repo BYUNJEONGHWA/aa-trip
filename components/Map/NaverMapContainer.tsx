@@ -48,6 +48,9 @@ export default function NaverMapContainer({
   // Track initial fit bounds to preserve user's zoom & center position when adding schedules
   const hasInitialFitRef = useRef(false);
 
+  // Last size actually pushed into the map, so repeated resize probes don't refetch tiles
+  const lastAppliedSizeRef = useRef<{ w: number; h: number } | null>(null);
+
   // Move Naver Map camera center to newly added place
   useEffect(() => {
     if (!focusPlaceLocation || !naverMapInstance.current || !window.naver?.maps) return;
@@ -60,20 +63,25 @@ export default function NaverMapContainer({
     }
   }, [focusPlaceLocation]);
 
-  // Handle Map Resizing when viewState changes
+  // Handle Map Resizing when viewState changes (see triggerMapResize for the 0px guard)
   useEffect(() => {
-    if (naverMapInstance.current && window.naver?.maps) {
+    if (!naverMapInstance.current || !window.naver?.maps) return;
+
+    // The panel width animates for 300ms (transition-all duration-300). A single probe
+    // lands mid-animation and sizes the map to an intermediate width, so re-measure
+    // across and after the animation instead.
+    const delays = [0, 120, 320, 550];
+    const timers = delays.map((d) =>
       setTimeout(() => {
         window.dispatchEvent(new Event('resize'));
-        if (naverMapInstance.current.setSize) {
-          const container = mapRef.current;
-          if (container) {
-            naverMapInstance.current.setSize(new window.naver.maps.Size(container.clientWidth, container.clientHeight));
-          }
-        }
-      }, 200);
-    }
+        triggerMapResizeRef.current?.();
+      }, d)
+    );
+    return () => timers.forEach(clearTimeout);
   }, [mapViewState]);
+
+  // Holds the latest triggerMapResize (declared further below) so effects above can use it
+  const triggerMapResizeRef = useRef<(() => void) | null>(null);
 
   const [isLoaded, setIsLoaded] = useState(false);
   const [activeTab, setActiveTab] = useState<'ALL' | 'ACTIVE_DAY'>('ALL');
@@ -208,6 +216,19 @@ export default function NaverMapContainer({
     const height = mapRef.current.clientHeight;
     if (width === 0 && height === 0 && !isMobileVisible) return;
 
+    // If a previous instance is bound to a detached/stale DOM node, discard it and rebuild
+    if (naverMapInstance.current && !mapRef.current.querySelector('div')) {
+      try {
+        naverMapInstance.current.destroy?.();
+      } catch (e) {
+        console.warn('Map destroy error:', e);
+      }
+      naverMapInstance.current = null;
+      markersRef.current = [];
+      polylinesRef.current = [];
+      hasInitialFitRef.current = false;
+    }
+
     if (!naverMapInstance.current) {
       const safeCenter = getSafeLatLng(35.15, 126.90);
       if (safeCenter.isFallback) {
@@ -329,15 +350,48 @@ export default function NaverMapContainer({
     if (naverMapInstance.current && window.naver?.maps) {
       const container = mapRef.current;
       if (container) {
+        // Naver's setSize writes inline px width/height onto the container. If it ever
+        // ran while the panel was collapsed it would pin the container at 0px and the
+        // map could never measure itself back up. Restore 100% before measuring.
+        container.style.width = '100%';
+        container.style.height = '100%';
+
         const w = container.clientWidth;
         const h = container.clientHeight;
-        if (w > 0 && h > 0) {
-          naverMapInstance.current.setSize(new window.naver.maps.Size(w, h));
-          window.naver.maps.Event.trigger(naverMapInstance.current, 'resize');
+
+        // Collapsed/hidden: don't size the map to 0 (that pins it shut). Just drop the
+        // memo so the next visible measurement is always re-applied.
+        if (w === 0 || h === 0) {
+          lastAppliedSizeRef.current = null;
+          return;
         }
+
+        const last = lastAppliedSizeRef.current;
+        if (last && last.w === w && last.h === h) return; // already applied, skip tile refetch
+        lastAppliedSizeRef.current = { w, h };
+
+        const map = naverMapInstance.current;
+        // Preserve the viewport across the resize — setSize/refresh can drift the center.
+        const center = map.getCenter?.();
+
+        map.setSize(new window.naver.maps.Size(w, h));
+
+        // refresh(true) is the documented Naver Maps v3 way to force a full tile redraw
+        // after the container was hidden/resized. Event.trigger(map, 'resize') is NOT a
+        // supported map event and leaves the tiles unpainted (blank map).
+        if (typeof map.refresh === 'function') {
+          map.refresh(true);
+        }
+
+        if (center) map.setCenter(center);
       }
     }
   }, [createMapInstance]);
+
+  // Expose the latest triggerMapResize to the mapViewState effect declared above
+  useEffect(() => {
+    triggerMapResizeRef.current = triggerMapResize;
+  }, [triggerMapResize]);
 
   // Automated Naver Map Resizing via ResizeObserver & Window/Orientation Events
   useEffect(() => {
@@ -553,10 +607,13 @@ export default function NaverMapContainer({
 
   const activeWeekdayLabel = activeItinerary?.weekdayLabel || '';
 
-  // Collapsed Minimized Vertical Bar view
-  if (mapViewState === 'MINIMIZED') {
-    return (
-      <div className="h-full w-full bg-slate-900 flex flex-col items-center justify-between py-4 border-l border-slate-800 shadow-2xl">
+  const isMinimized = mapViewState === 'MINIMIZED';
+
+  // Collapsed Minimized Vertical Bar view.
+  // NOTE: The map subtree below is only hidden (never unmounted) so the Naver Map
+  // instance stays bound to a live DOM node and reappears on restore.
+  const minimizedBar = isMinimized ? (
+    <div className="h-full w-full bg-slate-900 flex flex-col items-center justify-between py-4 border-l border-slate-800 shadow-2xl">
         <button
           onClick={() => setMapViewState?.('NORMAL')}
           className="p-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold flex flex-col items-center gap-2 shadow-lg transition-all hover:scale-105"
@@ -577,11 +634,16 @@ export default function NaverMapContainer({
           </span>
         </div>
       </div>
-    );
-  }
+  ) : null;
 
   return (
-    <div className="w-full h-full relative flex flex-col bg-slate-100 border-l border-slate-200 overflow-y-auto md:overflow-hidden">
+    <>
+    {minimizedBar}
+    <div
+      className={`w-full h-full relative flex-col bg-slate-100 border-l border-slate-200 overflow-y-auto md:overflow-hidden ${
+        isMinimized ? 'hidden' : 'flex'
+      }`}
+    >
       {/* Top Controls Bar (Desktop: Floating Absolute / Mobile: Static Stack) */}
       <div className="relative md:absolute md:top-4 md:left-4 md:right-4 z-20 bg-white/95 backdrop-blur-md p-2.5 rounded-none md:rounded-xl border-b md:border border-slate-200 shadow-xs md:shadow-md flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-1.5 flex-wrap">
@@ -902,5 +964,6 @@ export default function NaverMapContainer({
 
       <NaverKeyModal isOpen={isKeyModalOpen} onClose={() => setIsKeyModalOpen(false)} />
     </div>
+    </>
   );
 }

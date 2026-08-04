@@ -116,8 +116,14 @@ async function writeTripRows(payload: SavedTripPayload) {
   if (tripError) throw tripError;
 
   // 2. Upsert Places library (scoped by tripId)
-  if (places.length > 0) {
-    const placesData = places.map((p) => ({
+  // Skip any place still carrying the literal name "RELA" — that was a parser bug
+  // (app/api/parse-naver picked up an unrelated internal field for non-restaurant
+  // categories, now fixed) that got cached in some clients' local/localStorage state.
+  // A stale client re-saving that value would silently regress an already-corrected
+  // row, so those rows are left untouched here rather than upserted.
+  const placesToSave = places.filter((p) => p.name !== 'RELA');
+  if (placesToSave.length > 0) {
+    const placesData = placesToSave.map((p) => ({
       id: p.id,
       trip_id: tripId,
       name: p.name,

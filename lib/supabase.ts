@@ -14,8 +14,15 @@ export const isSupabaseConfigured = (): boolean => {
 };
 
 // Singleton Supabase Client
+// keepalive lets a save that's already in flight survive a refresh/tab-close instead of
+// being cancelled mid-request by the browser — every edit is expected to persist
+// immediately, including the one fired right before the page navigates away.
 export const supabase: SupabaseClient | null = isSupabaseConfigured()
-  ? createClient(supabaseUrl, supabaseAnonKey)
+  ? createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        fetch: (input, init) => fetch(input, { ...init, keepalive: true }),
+      },
+    })
   : null;
 
 export interface SavedTripPayload {

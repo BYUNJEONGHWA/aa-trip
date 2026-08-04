@@ -47,13 +47,8 @@ export default function PlaceCard({ place, isDragOverlay }: PlaceCardProps) {
         setNodeRef(node);
       }}
       style={style}
-      draggable={true}
-      onDragStart={(e) => {
-        try {
-          e.dataTransfer.setData('text/plain', JSON.stringify({ placeId: place.id, type: 'ADD_PLACE' }));
-          e.dataTransfer.effectAllowed = 'copy';
-        } catch (err) {}
-      }}
+      {...listeners}
+      {...attributes}
       className={`group relative rounded-xl p-3.5 border transition-all duration-200 cursor-grab active:cursor-grabbing ${
         isDragging
           ? 'opacity-40 border-dashed border-emerald-500 bg-emerald-50/30'
@@ -67,8 +62,6 @@ export default function PlaceCard({ place, isDragOverlay }: PlaceCardProps) {
       <div className="flex items-start justify-between gap-2">
         {/* Drag Handle Icon */}
         <div
-          {...listeners}
-          {...attributes}
           className="p-1 text-slate-300 hover:text-slate-600 rounded hover:bg-slate-100 shrink-0 self-center -ml-1 transition-colors"
           title="드래그해서 일차로 이동"
         >

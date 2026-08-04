@@ -524,20 +524,15 @@ export default function NaverMapContainer({
           (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
             window.innerWidth < 768);
 
-        const state = useAppStore.getState();
         setSelectedPlaceId(place.id);
 
         if (isMobile) {
           // Mobile: Single tap opens the "Select Day to Add" modal popup
           setMobileAddModalPlace(place);
-        } else {
-          // PC Desktop: Second click on already selected place -> Add to active day
-          if (state.selectedPlaceId === place.id) {
-            state.addPlaceToDay(place.id, state.activeDayIndex);
-            setToastMessage(`✨ [${place.name}]이(가) ${state.activeDayIndex + 1}일차 일정에 추가되었습니다!`);
-            setTimeout(() => setToastMessage(null), 2500);
-          }
         }
+        // PC Desktop: click only selects. Adding is handled by the 'dblclick' listener
+        // below — a double click fires click, click, dblclick, so adding here too would
+        // append the place TWICE for a single gesture.
       });
 
       window.naver.maps.Event.addListener(marker, 'dblclick', () => {

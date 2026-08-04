@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import { DayItinerary } from '@/lib/types';
 import { useAppStore } from '@/lib/store';
 import { getDayColorTheme } from '@/lib/constants';
@@ -32,10 +32,7 @@ export default function DayColumn({ itinerary }: DayColumnProps) {
     dayCount,
     activeDayIndex,
     setActiveDayIndex,
-    addPlaceToDay,
   } = useAppStore();
-
-  const [isNativeDragOver, setIsNativeDragOver] = useState(false);
 
   const { setNodeRef, isOver } = useDroppable({
     id: `day-column-${itinerary.dayIndex}`,
@@ -44,7 +41,7 @@ export default function DayColumn({ itinerary }: DayColumnProps) {
 
   const theme = getDayColorTheme(itinerary.dayIndex);
   const isActive = activeDayIndex === itinerary.dayIndex;
-  const isHighlightedDrop = isOver || isNativeDragOver;
+  const isHighlightedDrop = isOver;
 
   // Scheduled items for this specific day, sorted by order
   const daySchedules = scheduledPlaces
@@ -59,39 +56,15 @@ export default function DayColumn({ itinerary }: DayColumnProps) {
     return issues.some((i) => i.type === 'DAY_OFF');
   });
 
-  // Native HTML5 Drop Handlers for 100% reliable drop from Sidebar
-  const handleNativeDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'copy';
-    if (!isNativeDragOver) setIsNativeDragOver(true);
-  };
-
-  const handleNativeDragLeave = () => {
-    setIsNativeDragOver(false);
-  };
-
-  const handleNativeDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsNativeDragOver(false);
-    try {
-      const raw = e.dataTransfer.getData('text/plain');
-      if (raw) {
-        const data = JSON.parse(raw);
-        if (data.placeId) {
-          addPlaceToDay(data.placeId, itinerary.dayIndex);
-        }
-      }
-    } catch (err) {
-      console.warn('Native drop error:', err);
-    }
-  };
+  // NOTE: this column used to ALSO carry native HTML5 drop handlers that called
+  // addPlaceToDay. PlaceCard was simultaneously a dnd-kit draggable and a native
+  // draggable, so one drag fired BOTH the dnd-kit onDragEnd in app/page.tsx and this
+  // native onDrop — appending the same place twice. dnd-kit is now the single source
+  // of drag-and-drop; its useDroppable above provides the drop target and highlight.
 
   return (
     <div
       onClick={() => setActiveDayIndex(itinerary.dayIndex)}
-      onDragOver={handleNativeDragOver}
-      onDragLeave={handleNativeDragLeave}
-      onDrop={handleNativeDrop}
       className={`w-full md:w-80 flex-shrink-0 bg-white rounded-2xl border flex flex-col h-auto md:h-full overflow-hidden transition-all shadow-md ${
         isHighlightedDrop
           ? 'border-emerald-500 ring-4 ring-emerald-500/30 bg-emerald-50/20 scale-[1.01]'

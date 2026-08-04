@@ -3,14 +3,60 @@
 import React, { useState } from 'react';
 import { useAppStore } from '@/lib/store';
 import DayColumn from './DayColumn';
-import { Plus, Calendar, Layers } from 'lucide-react';
+import { Plus, Calendar, Layers, CopyX } from 'lucide-react';
 
 export default function KanbanBoard() {
-  const { dayItineraries, addDay, activeDayIndex, setActiveDayIndex } = useAppStore();
+  const {
+    dayItineraries,
+    addDay,
+    activeDayIndex,
+    setActiveDayIndex,
+    scheduledPlaces,
+    places,
+    dedupeScheduledPlaces,
+  } = useAppStore();
   const [mobileViewMode, setMobileViewMode] = useState<'SINGLE' | 'STACKED'>('SINGLE');
+
+  // Count schedules that repeat the same place within the same day (legacy duplicates)
+  const duplicateCount = React.useMemo(() => {
+    const seen = new Set<string>();
+    let dupes = 0;
+    scheduledPlaces.forEach((s) => {
+      const key = `${s.dayIndex}__${s.placeId}`;
+      if (seen.has(key)) dupes++;
+      else seen.add(key);
+    });
+    return dupes;
+  }, [scheduledPlaces]);
+
+  const handleDedupe = () => {
+    const removed = dedupeScheduledPlaces();
+    if (removed > 0) {
+      window.alert(`중복된 일정 ${removed}개를 정리했습니다.`);
+    }
+  };
 
   return (
     <div className="w-full h-full min-h-0 flex flex-col overflow-hidden select-none bg-slate-100/50 relative">
+      {/* Legacy duplicate schedule cleanup banner */}
+      {duplicateCount > 0 && (
+        <div className="shrink-0 z-10 bg-amber-50 border-b border-amber-300 px-3 py-2 flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2 text-xs font-bold text-amber-900">
+            <CopyX className="w-4 h-4 text-amber-600 shrink-0" />
+            <span>
+              같은 일차에 중복 등록된 일정이 <strong className="text-amber-700">{duplicateCount}개</strong> 있습니다.
+            </span>
+          </div>
+          <button
+            onClick={handleDedupe}
+            className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-black shadow-2xs active:scale-95 transition-all shrink-0"
+            title={`중복 일정 ${duplicateCount}개를 삭제하고 순서를 다시 정렬합니다 (장소 ${places.length}곳은 유지)`}
+          >
+            중복 {duplicateCount}개 정리하기
+          </button>
+        </div>
+      )}
+
       {/* Mobile Top Controls & Add Day Bar (< 768px) */}
       <div className="md:hidden bg-white border-b border-slate-200 p-3 space-y-2 shrink-0 shadow-xs z-10">
         <div className="flex items-center justify-between gap-2">

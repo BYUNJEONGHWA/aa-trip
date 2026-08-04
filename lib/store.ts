@@ -60,6 +60,7 @@ interface AppState {
 
   addPlaceToDay: (placeId: string, dayIndex: number) => void;
   removeScheduledPlace: (scheduleId: string) => void;
+  dedupeScheduledPlaces: () => number;
   reorderDaySchedule: (dayIndex: number, activeScheduleId: string, overScheduleId: string) => void;
   moveScheduleToDay: (scheduleId: string, targetDayIndex: number) => void;
 
@@ -280,6 +281,37 @@ export const useAppStore = create<AppState>()(
           set((state) => ({
             scheduledPlaces: state.scheduledPlaces.filter((s) => s.scheduleId !== scheduleId),
           }));
+        },
+
+        // One-shot cleanup for schedules duplicated by the old double-firing add paths.
+        // Keeps the first occurrence of each (dayIndex, placeId) pair and re-numbers order.
+        // Returns how many entries were removed.
+        dedupeScheduledPlaces: () => {
+          const state = get();
+          const seen = new Set<string>();
+          const kept: ScheduledPlace[] = [];
+
+          [...state.scheduledPlaces]
+            .sort((a, b) => a.dayIndex - b.dayIndex || a.order - b.order)
+            .forEach((s) => {
+              const key = `${s.dayIndex}__${s.placeId}`;
+              if (seen.has(key)) return;
+              seen.add(key);
+              kept.push(s);
+            });
+
+          const removedCount = state.scheduledPlaces.length - kept.length;
+          if (removedCount === 0) return 0;
+
+          const orderCounters: Record<number, number> = {};
+          const reindexed = kept.map((s) => {
+            const nextOrder = orderCounters[s.dayIndex] ?? 0;
+            orderCounters[s.dayIndex] = nextOrder + 1;
+            return { ...s, order: nextOrder };
+          });
+
+          set({ scheduledPlaces: reindexed });
+          return removedCount;
         },
 
         reorderDaySchedule: (dayIndex, activeScheduleId, overScheduleId) => {

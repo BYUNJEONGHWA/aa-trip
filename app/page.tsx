@@ -31,7 +31,7 @@ import {
   useSensors,
   DragStartEvent,
   DragEndEvent,
-  rectIntersection,
+  closestCenter,
 } from '@dnd-kit/core';
 
 import { MapPin, Calendar, Map as MapIcon } from 'lucide-react';
@@ -404,7 +404,7 @@ export default function Home() {
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={rectIntersection}
+      collisionDetection={closestCenter}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >

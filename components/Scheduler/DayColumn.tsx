@@ -173,7 +173,7 @@ export default function DayColumn({ itinerary }: DayColumnProps) {
       {/* Scheduled Card List Area - Droppable & Sortable */}
       <div
         ref={setNodeRef}
-        className={`flex-1 overflow-y-auto max-h-[55vh] md:max-h-none p-3 space-y-2.5 min-h-[160px] touch-pan-y transition-colors ${
+        className={`flex-1 md:overflow-y-auto p-3 space-y-2.5 min-h-[160px] touch-pan-y transition-colors ${
           isHighlightedDrop ? 'bg-emerald-50/60 ring-2 ring-emerald-500/40' : 'bg-slate-50/40'
         }`}
       >

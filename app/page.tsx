@@ -413,7 +413,7 @@ export default function Home() {
         <Header />
 
         {/* Main Workspace Layout (Desktop Side-by-Side / Mobile Single View) */}
-        <div className="flex-1 flex flex-col md:flex-row overflow-y-auto md:overflow-hidden relative min-h-0">
+        <div className="flex-1 flex flex-col md:flex-row overflow-visible md:overflow-hidden relative md:min-h-0">
           {/* Left Sidebar: Places Ingestion & Day-Off Filters */}
           <div className={`${mobileActiveView === 'PLACES' ? 'flex w-full' : 'hidden'} md:flex md:w-80 h-full shrink-0`}>
             <Sidebar />
@@ -425,12 +425,12 @@ export default function Home() {
               mobileActiveView === 'SCHEDULER' ? 'flex' : 'hidden'
             } md:flex ${
               mapViewState === 'MAXIMIZED' ? 'md:hidden' : 'flex-1'
-            } h-full min-h-0 bg-slate-50 overflow-hidden flex-col transition-all duration-300`}
+            } h-auto md:h-full md:min-h-0 bg-slate-50 overflow-visible md:overflow-hidden flex-col transition-all duration-300`}
           >
             {/* In-Scheduler Trip Folder Tab Bar & Real-time Auto-Save Status */}
             <TripFolderTabs />
 
-            <div className="flex-1 min-h-0 w-full overflow-hidden flex flex-col relative">
+            <div className="flex-1 md:min-h-0 w-full overflow-visible md:overflow-hidden flex flex-col relative">
               <KanbanBoard />
             </div>
           </div>

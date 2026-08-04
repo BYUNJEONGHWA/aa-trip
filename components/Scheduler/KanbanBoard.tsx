@@ -10,7 +10,7 @@ export default function KanbanBoard() {
   const [mobileViewMode, setMobileViewMode] = useState<'SINGLE' | 'STACKED'>('SINGLE');
 
   return (
-    <div className="w-full h-full min-h-0 flex flex-col overflow-hidden select-none bg-slate-100/50 relative">
+    <div className="w-full h-auto md:h-full md:min-h-0 flex flex-col overflow-visible md:overflow-hidden select-none bg-slate-100/50 relative">
 
       {/* Mobile Top Controls & Add Day Bar (< 768px) */}
       <div className="md:hidden bg-white border-b border-slate-200 p-3 space-y-2 shrink-0 shadow-xs z-10">
@@ -77,7 +77,7 @@ export default function KanbanBoard() {
       {/* Main Kanban Content Container */}
       {/* Mobile (< 768px): Vertical Stack or Selected Single Day with Full Mobile Scroll */}
       {/* Desktop (>= 768px): Side-by-Side Horizontal Scrollable Board */}
-      <div className="w-full flex-1 min-h-0 overflow-y-auto overflow-x-hidden md:overflow-x-auto md:overflow-y-hidden p-3 sm:p-4 flex flex-col md:flex-row gap-4 items-start pb-24 md:pb-6 touch-pan-y">
+      <div className="w-full flex-1 md:min-h-0 overflow-x-hidden md:overflow-x-auto md:overflow-y-hidden p-3 sm:p-4 flex flex-col md:flex-row gap-4 items-start pb-24 md:pb-6 touch-pan-y">
         {/* Mobile Single View mode */}
         <div className="md:hidden w-full space-y-4">
           {mobileViewMode === 'SINGLE' ? (

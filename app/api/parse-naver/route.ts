@@ -103,7 +103,15 @@ async function parseSinglePlaceBySid(sid: string): Promise<Place | null> {
     if (!pageHtml.trim()) return null;
 
     // Extract Name & Category
-    const nameMatch = pageHtml.match(/"name"\s*:\s*"([^"]+)"/);
+    // The naive "first `"name":` in the page" match is unsafe: for non-restaurant
+    // categories (stations, terminals, markets, ...) Naver's restaurant-page template
+    // still returns 200 with an embedded Apollo cache "PoiInfoShapeKey" object that
+    // appears BEFORE the real data and always has the literal name "RELA" (an internal
+    // schema/shape identifier, not a place name). The real name lives in the
+    // "PlaceDetailBase" typed object, so anchor to that first.
+    const nameMatch =
+      pageHtml.match(/"__typename":"PlaceDetailBase"[^}]*?"name":"([^"]+)"/) ||
+      pageHtml.match(/"name"\s*:\s*"([^"]+)"/);
     const name = nameMatch?.[1] || `장소 ${sid}`;
 
     const categoryMatch = pageHtml.match(/"category"\s*:\s*"([^"]+)"/);

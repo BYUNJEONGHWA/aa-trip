@@ -395,6 +395,14 @@ export const useAppStore = create<AppState>()(
             return true;
           });
 
+          // Keep the day the user is working on. This runs on every background sync, so
+          // forcing 0 would snap them back to day 1 mid-edit. Reset only when this is a
+          // different trip, or when the selected day no longer exists.
+          const state = get();
+          const isSameTrip = !tripId || tripId === state.activeTripId;
+          const keepDay = isSameTrip && state.activeDayIndex < dayCount;
+          const nextActiveDayIndex = keepDay ? state.activeDayIndex : 0;
+
           set({
             ...(tripId ? { activeTripId: tripId } : {}),
             ...(title ? { activeTripTitle: title } : {}),
@@ -403,7 +411,7 @@ export const useAppStore = create<AppState>()(
             places: places || [],
             scheduledPlaces: cleanSchedules,
             dayItineraries: newItineraries,
-            activeDayIndex: 0,
+            activeDayIndex: nextActiveDayIndex,
           });
         },
       };

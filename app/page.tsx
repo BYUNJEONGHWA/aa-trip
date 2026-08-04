@@ -184,6 +184,10 @@ export default function Home() {
       try {
         await saveTripToSupabase(payload);
         if (pendingSaveRef.current === payload) pendingSaveRef.current = null;
+        // Our own save moved trips.updated_at. Record the new stamp, otherwise the
+        // poller reads it as someone else's change and reloads — which would reset the
+        // user's selected day mid-edit.
+        lastSeenStampRef.current = await fetchLatestTripStamp();
         setAutoSaveStatus('saved');
         setTimeout(() => setAutoSaveStatus('idle'), 3000);
       } catch (err) {
@@ -254,7 +258,11 @@ export default function Home() {
       const payload = pendingSaveRef.current;
       if (!payload || !isSupabaseConfigured()) return;
       pendingSaveRef.current = null;
-      saveTripToSupabase(payload).catch((e) => console.warn('Flush save error:', e));
+      saveTripToSupabase(payload)
+        .then(async () => {
+          lastSeenStampRef.current = await fetchLatestTripStamp();
+        })
+        .catch((e) => console.warn('Flush save error:', e));
     };
 
     const onVisibility = () => {

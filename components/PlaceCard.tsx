@@ -3,7 +3,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Place } from '@/lib/types';
 import { useAppStore } from '@/lib/store';
-import { Clock, Calendar, Car, Plus, Star, MapPin, GripVertical, Trash2 } from 'lucide-react';
+import { Clock, Calendar, Car, Plus, Star, MapPin, GripVertical, Trash2, ExternalLink } from 'lucide-react';
 import { WEEKDAY_KOREAN } from '@/lib/constants';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
@@ -31,6 +31,10 @@ export default function PlaceCard({ place, isDragOverlay }: PlaceCardProps) {
   });
 
   const isSelected = selectedPlaceId === place.id;
+
+  // place.id is formatted like "naver_place_{sid}" or "naver_place_{sid}_{n}" -
+  // strip the prefix/suffix to recover the numeric sid Naver Map uses in its own URLs.
+  const naverMapUrl = `https://map.naver.com/p/entry/place/${place.id.replace(/^[^\d]+/, '').replace(/_\d+$/, '')}`;
 
   const handleCardClick = () => {
     setSelectedPlaceId(place.id);
@@ -136,6 +140,17 @@ export default function PlaceCard({ place, isDragOverlay }: PlaceCardProps) {
 
         {/* Action Buttons: Quick Add & Delete */}
         <div className="flex items-center gap-1 shrink-0">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              window.open(naverMapUrl, '_blank', 'noopener,noreferrer');
+            }}
+            className="w-8 h-8 rounded-xl bg-slate-50 hover:bg-blue-600 text-slate-400 hover:text-white flex items-center justify-center transition-all border border-slate-200 hover:border-blue-600 shadow-2xs active:scale-95 cursor-pointer"
+            title="네이버 지도에서 보기"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+          </button>
+
           <button
             onClick={(e) => {
               e.stopPropagation();

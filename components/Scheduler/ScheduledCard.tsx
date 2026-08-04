@@ -116,24 +116,6 @@ export default function ScheduledCard({
               <Trash2 className="w-3.5 h-3.5" />
             </button>
           </div>
-
-          <div className="flex items-center gap-1 pl-5 mt-1">
-            <Clock className="w-3 h-3 text-amber-500 shrink-0" />
-            <input
-              type="number"
-              min={0}
-              step={5}
-              value={scheduledPlace.breakDurationMinutes ?? 30}
-              onChange={(e) =>
-                updateBreak(scheduledPlace.scheduleId, {
-                  breakDurationMinutes: Math.max(0, Number(e.target.value) || 0),
-                })
-              }
-              onClick={(e) => e.stopPropagation()}
-              className="w-12 text-xs font-semibold text-amber-800 bg-transparent focus:outline-none"
-            />
-            <span className="text-[11px] text-amber-700 font-medium">분</span>
-          </div>
         </div>
       </div>
     );

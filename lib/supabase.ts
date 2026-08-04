@@ -158,7 +158,6 @@ async function writeTripRows(payload: SavedTripPayload) {
       order_index: s.order,
       item_type: s.type || 'PLACE',
       break_label: s.breakLabel || null,
-      break_duration_minutes: s.breakDurationMinutes ?? null,
     }));
 
     const { error: schedError } = await supabase.from('scheduled_places').insert(scheduledData);
@@ -251,7 +250,6 @@ export async function loadTripFromSupabase(tripId: string): Promise<SavedTripPay
       order: s.order_index,
       type: s.item_type === 'BREAK' ? 'BREAK' : 'PLACE',
       breakLabel: s.break_label || undefined,
-      breakDurationMinutes: s.break_duration_minutes ?? undefined,
     });
   });
 

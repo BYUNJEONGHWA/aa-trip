@@ -59,7 +59,7 @@ interface AppState {
 
   addPlaceToDay: (placeId: string, dayIndex: number) => void;
   addBreakToDay: (dayIndex: number) => void;
-  updateBreak: (scheduleId: string, updates: { breakLabel?: string; breakDurationMinutes?: number }) => void;
+  updateBreak: (scheduleId: string, updates: { breakLabel?: string }) => void;
   removeScheduledPlace: (scheduleId: string) => void;
   reorderDaySchedule: (dayIndex: number, activeScheduleId: string, overScheduleId: string) => void;
   moveScheduleToDay: (scheduleId: string, targetDayIndex: number) => void;
@@ -287,7 +287,6 @@ export const useAppStore = create<AppState>()(
               order: dayItems.length,
               type: 'BREAK',
               breakLabel: '휴식',
-              breakDurationMinutes: 30,
             };
             return {
               scheduledPlaces: [...state.scheduledPlaces, newBreak],

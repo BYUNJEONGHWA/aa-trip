@@ -5,7 +5,7 @@ import { Place, ScheduledPlace } from '@/lib/types';
 import { useAppStore } from '@/lib/store';
 import { getDayColorTheme } from '@/lib/constants';
 import { validateScheduledPlace } from '@/lib/routeOptimizer';
-import { Trash2, AlertTriangle, Clock, GripVertical, Coffee, CheckSquare, Square } from 'lucide-react';
+import { Trash2, AlertTriangle, Clock, GripVertical, Coffee, CheckSquare, Square, ExternalLink } from 'lucide-react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
@@ -128,6 +128,10 @@ export default function ScheduledCard({
   const validationIssues = validateScheduledPlace(place, currentDayInfo.weekday, currentDayInfo.dateStr);
   const hasDayOffWarning = validationIssues.some((i) => i.type === 'DAY_OFF');
 
+  // place.id is formatted like "naver_place_{sid}" or "naver_place_{sid}_{n}" -
+  // strip the prefix/suffix to recover the numeric sid Naver Map uses in its own URLs.
+  const naverMapUrl = `https://map.naver.com/p/entry/place/${place.id.replace(/^[^\d]+/, '').replace(/_\d+$/, '')}`;
+
   const style = {
     transform: CSS.Translate.toString(transform),
     transition,
@@ -196,6 +200,17 @@ export default function ScheduledCard({
               title="후보그룹으로 묶을 항목 선택"
             >
               {isCandidateSelected ? <CheckSquare className="w-3.5 h-3.5" /> : <Square className="w-3.5 h-3.5" />}
+            </button>
+
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                window.open(naverMapUrl, '_blank', 'noopener,noreferrer');
+              }}
+              className="w-6 h-6 rounded flex items-center justify-center text-slate-300 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+              title="네이버 지도에서 보기"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
             </button>
 
             <button

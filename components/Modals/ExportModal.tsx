@@ -4,7 +4,7 @@ import React from 'react';
 import { useAppStore } from '@/lib/store';
 import { getDayColorTheme } from '@/lib/constants';
 import { validateScheduledPlace, calculateDistanceKm } from '@/lib/routeOptimizer';
-import { X, Printer, Share2, Copy, Check, MapPin, Calendar, Clock, AlertTriangle } from 'lucide-react';
+import { X, Printer, Share2, Copy, Check, MapPin, Calendar, Clock, AlertTriangle, FileSpreadsheet } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
 export default function ExportModal() {
@@ -59,6 +59,76 @@ export default function ExportModal() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  // CSV rather than a real .xlsx: the xlsx npm package (SheetJS) has unpatched
+  // high-severity prototype-pollution/ReDoS advisories with no fix available, and Excel
+  // opens a UTF-8 CSV natively - no extra dependency, no vulnerability surface.
+  const handleExportExcel = () => {
+    const headers = ['일차', '날짜', '요일', '순서', '장소명', '카테고리', '주소', '영업시간', '휴무정보', '일자 메모'];
+    const rows: string[][] = [headers];
+
+    dayItineraries.forEach((it) => {
+      const daySchedules = scheduledPlaces
+        .filter((s) => s.dayIndex === it.dayIndex)
+        .sort((a, b) => a.order - b.order);
+
+      if (daySchedules.length === 0) {
+        rows.push([it.title, it.dateStr, it.weekdayLabel, '', '등록된 일정이 없습니다.', '', '', '', '', it.notes || '']);
+        return;
+      }
+
+      const seenGroupIds = new Set<string>();
+      daySchedules.forEach((s, idx) => {
+        const order = String(idx + 1);
+        const notes = idx === 0 ? it.notes || '' : '';
+
+        if (s.groupId) {
+          if (seenGroupIds.has(s.groupId)) return;
+          seenGroupIds.add(s.groupId);
+          const candidateNames = daySchedules
+            .filter((c) => c.groupId === s.groupId)
+            .map((c) => places.find((p) => p.id === c.placeId)?.name)
+            .filter((name): name is string => !!name);
+          rows.push([it.title, it.dateStr, it.weekdayLabel, order, `[후보] ${candidateNames.join(' / ')}`, '후보그룹', '', '', '', notes]);
+          return;
+        }
+
+        if (s.type === 'BREAK') {
+          rows.push([it.title, it.dateStr, it.weekdayLabel, order, `☕ ${s.breakLabel || '휴식'}`, '휴식', '', '', '', notes]);
+          return;
+        }
+
+        const p = places.find((place) => place.id === s.placeId);
+        if (!p) return;
+        rows.push([
+          it.title,
+          it.dateStr,
+          it.weekdayLabel,
+          order,
+          p.name,
+          p.category,
+          p.address,
+          p.operatingHours.display,
+          p.isEveryday ? '연중무휴' : p.dayOffRaw || '',
+          notes,
+        ]);
+      });
+    });
+
+    const escapeCsvCell = (val: string) => `"${val.replace(/"/g, '""')}"`;
+    const csvContent = rows.map((row) => row.map(escapeCsvCell).join(',')).join('\r\n');
+    // Leading BOM so Excel on Windows detects UTF-8 instead of mangling Hangul.
+    const utf8Bom = String.fromCharCode(0xfeff);
+    const blob = new Blob([utf8Bom + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `여행일정_${startDate}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-3xl max-h-[85vh] shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
@@ -83,6 +153,13 @@ export default function ExportModal() {
             >
               {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
               <span>{copied ? '복사 완료!' : '텍스트 복사'}</span>
+            </button>
+            <button
+              onClick={handleExportExcel}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold border border-slate-700 transition-colors"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+              <span>엑셀 저장</span>
             </button>
             <button
               onClick={handlePrint}

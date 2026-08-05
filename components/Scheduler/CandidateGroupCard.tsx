@@ -3,7 +3,7 @@
 import React from 'react';
 import { useAppStore } from '@/lib/store';
 import { ScheduledPlace } from '@/lib/types';
-import { Users, Check, Trash2, Clock } from 'lucide-react';
+import { Users, Check, Trash2, Clock, ExternalLink } from 'lucide-react';
 
 interface CandidateGroupCardProps {
   groupId: string;
@@ -34,6 +34,9 @@ export default function CandidateGroupCard({ groupId, candidates }: CandidateGro
         {candidates.map((c) => {
           const place = places.find((p) => p.id === c.placeId);
           if (!place) return null;
+          // place.id is formatted like "naver_place_{sid}" or "naver_place_{sid}_{n}" -
+          // strip the prefix/suffix to recover the numeric sid Naver Map uses in its own URLs.
+          const naverMapUrl = `https://map.naver.com/p/entry/place/${place.id.replace(/^[^\d]+/, '').replace(/_\d+$/, '')}`;
           return (
             <div
               key={c.scheduleId}
@@ -56,6 +59,16 @@ export default function CandidateGroupCard({ groupId, candidates }: CandidateGro
               </div>
 
               <div className="flex items-center gap-1 shrink-0">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    window.open(naverMapUrl, '_blank', 'noopener,noreferrer');
+                  }}
+                  className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                  title="네이버 지도에서 보기"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                </button>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();

@@ -36,9 +36,10 @@ export function estimateTravelTimeMinutes(distanceKm: number): number {
 /**
  * Route Optimization (Nearest Neighbor Algorithm)
  *
- * BREAK items (and any place item missing from placeMap) have no coordinates to route
- * through, so they are kept fixed in their original slot; only the real place visits
- * around them are reordered by nearest-neighbor and poured back into the remaining slots.
+ * BREAK items, undecided candidate-group members, and any place item missing from
+ * placeMap have no single fixed coordinate to route through, so they are kept fixed in
+ * their original slot; only the real place visits around them are reordered by
+ * nearest-neighbor and poured back into the remaining slots.
  */
 export function optimizeRouteOrder(
   scheduledList: ScheduledPlace[],
@@ -46,7 +47,8 @@ export function optimizeRouteOrder(
 ): ScheduledPlace[] {
   const sorted = [...scheduledList].sort((a, b) => a.order - b.order);
 
-  const isRoutable = (item: ScheduledPlace) => item.type !== 'BREAK' && placeMap.has(item.placeId);
+  const isRoutable = (item: ScheduledPlace) =>
+    item.type !== 'BREAK' && !item.groupId && placeMap.has(item.placeId);
   const validItems = sorted.filter(isRoutable);
   if (validItems.length <= 2) return sorted.map((item, idx) => ({ ...item, order: idx }));
 

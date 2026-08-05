@@ -5,6 +5,7 @@ import { DayItinerary } from '@/lib/types';
 import { useAppStore } from '@/lib/store';
 import { getDayColorTheme } from '@/lib/constants';
 import ScheduledCard from './ScheduledCard';
+import CandidateGroupCard from './CandidateGroupCard';
 import { validateScheduledPlace } from '@/lib/routeOptimizer';
 import {
   Sparkles,
@@ -63,6 +64,29 @@ export default function DayColumn({ itinerary }: DayColumnProps) {
 
   const breakCount = daySchedules.filter((s) => s.type === 'BREAK').length;
   const placeCount = daySchedules.length - breakCount;
+
+  // Collapse candidate-group members (2+ scheduled places sharing a groupId, awaiting a
+  // pick) into a single visual slot rendered by CandidateGroupCard. Everything else
+  // renders as its own ScheduledCard.
+  type RenderItem =
+    | { kind: 'single'; schedule: (typeof daySchedules)[number] }
+    | { kind: 'group'; groupId: string; candidates: typeof daySchedules };
+
+  const renderItems: RenderItem[] = [];
+  const seenGroupIds = new Set<string>();
+  daySchedules.forEach((schedule) => {
+    if (schedule.groupId) {
+      if (seenGroupIds.has(schedule.groupId)) return;
+      seenGroupIds.add(schedule.groupId);
+      renderItems.push({
+        kind: 'group',
+        groupId: schedule.groupId,
+        candidates: daySchedules.filter((s) => s.groupId === schedule.groupId),
+      });
+    } else {
+      renderItems.push({ kind: 'single', schedule });
+    }
+  });
 
   // Check for any validation warnings in this day using exact dateStr
   const dayOffWarnings = daySchedules.filter((s) => {
@@ -190,10 +214,10 @@ export default function DayColumn({ itinerary }: DayColumnProps) {
         }`}
       >
         <SortableContext
-          items={daySchedules.map((s) => s.scheduleId)}
+          items={renderItems.filter((i) => i.kind === 'single').map((i) => (i.kind === 'single' ? i.schedule.scheduleId : ''))}
           strategy={verticalListSortingStrategy}
         >
-          {daySchedules.length === 0 ? (
+          {renderItems.length === 0 ? (
             <div className="h-full min-h-[180px] border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center p-4 text-center bg-white">
               <MapPin className="w-6 h-6 text-slate-400 mb-2" />
               <p className="text-xs text-slate-600 font-semibold">
@@ -204,15 +228,18 @@ export default function DayColumn({ itinerary }: DayColumnProps) {
               </p>
             </div>
           ) : (
-            daySchedules.map((schedule, index) => (
-              <ScheduledCard
-                key={schedule.scheduleId}
-                scheduledPlace={schedule}
-                orderIndex={index}
-                totalInDay={daySchedules.length}
-                nextScheduledPlace={daySchedules[index + 1]}
-              />
-            ))
+            renderItems.map((item, index) =>
+              item.kind === 'group' ? (
+                <CandidateGroupCard key={item.groupId} groupId={item.groupId} candidates={item.candidates} />
+              ) : (
+                <ScheduledCard
+                  key={item.schedule.scheduleId}
+                  scheduledPlace={item.schedule}
+                  orderIndex={index}
+                  totalInDay={renderItems.length}
+                />
+              )
+            )
           )}
         </SortableContext>
       </div>

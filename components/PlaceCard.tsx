@@ -3,7 +3,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Place } from '@/lib/types';
 import { useAppStore } from '@/lib/store';
-import { Clock, Calendar, Car, Plus, Star, MapPin, GripVertical, Trash2, ExternalLink } from 'lucide-react';
+import { Clock, Calendar, Car, Plus, Star, MapPin, GripVertical, Trash2, ExternalLink, CheckSquare, Square } from 'lucide-react';
 import { WEEKDAY_KOREAN } from '@/lib/constants';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
@@ -22,6 +22,8 @@ export default function PlaceCard({ place, isDragOverlay }: PlaceCardProps) {
     selectedPlaceId,
     setSelectedPlaceId,
     setFocusPlaceLocation,
+    candidateSelectionIds,
+    toggleCandidateSelection,
   } = useAppStore();
   const cardRef = useRef<HTMLDivElement | null>(null);
 
@@ -31,6 +33,7 @@ export default function PlaceCard({ place, isDragOverlay }: PlaceCardProps) {
   });
 
   const isSelected = selectedPlaceId === place.id;
+  const isCandidateSelected = candidateSelectionIds.includes(place.id);
 
   // place.id is formatted like "naver_place_{sid}" or "naver_place_{sid}_{n}" -
   // strip the prefix/suffix to recover the numeric sid Naver Map uses in its own URLs.
@@ -74,6 +77,8 @@ export default function PlaceCard({ place, isDragOverlay }: PlaceCardProps) {
           ? 'bg-emerald-50/90 border-emerald-500 ring-4 ring-emerald-500/30 shadow-xl scale-[1.02] z-10'
           : isDragOverlay
           ? 'shadow-2xl ring-2 ring-emerald-500 scale-105 bg-white border-slate-200 cursor-grabbing'
+          : isCandidateSelected
+          ? 'bg-violet-50/80 border-violet-400 ring-4 ring-violet-400/30 shadow-md'
           : 'bg-white hover:bg-slate-50/80 border-slate-200 hover:border-slate-300 shadow-xs hover:shadow-md'
       }`}
     >
@@ -138,8 +143,23 @@ export default function PlaceCard({ place, isDragOverlay }: PlaceCardProps) {
           </p>
         </div>
 
-        {/* Action Buttons: Quick Add & Delete */}
+        {/* Action Buttons: Candidate Select & Quick Add & Delete */}
         <div className="flex items-center gap-1 shrink-0">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleCandidateSelection(place.id);
+            }}
+            className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all border shadow-2xs active:scale-95 cursor-pointer ${
+              isCandidateSelected
+                ? 'bg-violet-600 hover:bg-violet-700 text-white border-violet-600'
+                : 'bg-slate-50 hover:bg-violet-50 text-slate-400 hover:text-violet-600 border-slate-200 hover:border-violet-300'
+            }`}
+            title="후보그룹으로 묶어서 나중에 고르기"
+          >
+            {isCandidateSelected ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+          </button>
+
           <button
             onClick={(e) => {
               e.stopPropagation();

@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useAppStore } from '@/lib/store';
 import PlaceCard from './PlaceCard';
-import { Search, Filter, PlusCircle, CheckCircle2, RefreshCw, Trash2 } from 'lucide-react';
+import { Search, Filter, PlusCircle, CheckCircle2, RefreshCw, Trash2, Users, X } from 'lucide-react';
 import { DayOffFilter, DayOfWeek, Place } from '@/lib/types';
 
 export default function Sidebar() {
@@ -19,6 +19,10 @@ export default function Sidebar() {
     setIsIngestModalOpen,
     setIsSearchModalOpen,
     selectedPlaceId,
+    activeDayIndex,
+    candidateSelectionIds,
+    clearCandidateSelection,
+    addCandidateGroupToDay,
   } = useAppStore();
 
   const [isRefreshingHours, setIsRefreshingHours] = useState(false);
@@ -188,6 +192,33 @@ export default function Sidebar() {
           />
         </div>
       </div>
+
+      {/* Candidate Group Selection Bar - appears once 1+ places are picked for grouping */}
+      {candidateSelectionIds.length > 0 && (
+        <div className="p-2.5 border-b border-violet-200 bg-violet-50 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 text-violet-800 font-black text-xs">
+            <Users className="w-3.5 h-3.5 shrink-0" />
+            <span>{candidateSelectionIds.length}곳 선택됨</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => clearCandidateSelection()}
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-violet-600 hover:bg-violet-100 border border-violet-200 transition-colors"
+              title="선택 취소"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => addCandidateGroupToDay(activeDayIndex)}
+              disabled={candidateSelectionIds.length < 2}
+              className="px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-xs font-black transition-colors whitespace-nowrap"
+              title={candidateSelectionIds.length < 2 ? '2곳 이상 선택해주세요' : `${activeDayIndex + 1}일차 후보그룹으로 추가`}
+            >
+              {activeDayIndex + 1}일차 후보그룹으로 묶기
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Dynamic Day-Off Filter Tabs */}
       <div className="p-3 border-b border-slate-200 bg-slate-50/60">

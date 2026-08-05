@@ -58,6 +58,7 @@ export interface ScheduledPlace {
   order: number; // Sequence index within the day (0, 1, 2...)
   type?: 'PLACE' | 'BREAK'; // Defaults to 'PLACE' when omitted
   breakLabel?: string; // e.g. "점심 식사", "휴식" - only for BREAK items
+  groupId?: string; // Shared by 2+ candidate places for the same slot, awaiting a pick
   startTime?: string; // e.g. "10:30"
   endTime?: string;   // e.g. "12:00"
   notes?: string;

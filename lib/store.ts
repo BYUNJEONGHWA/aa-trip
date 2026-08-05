@@ -29,6 +29,7 @@ interface AppState {
   dayCount: number;
   dayItineraries: DayItinerary[];
   scheduledPlaces: ScheduledPlace[];
+  candidateSelectionIds: string[]; // placeIds picked in the sidebar, pending grouping
 
   activeDayIndex: number;
   isIngestModalOpen: boolean;
@@ -63,6 +64,12 @@ interface AppState {
   removeScheduledPlace: (scheduleId: string) => void;
   reorderDaySchedule: (dayIndex: number, activeScheduleId: string, overScheduleId: string) => void;
   moveScheduleToDay: (scheduleId: string, targetDayIndex: number) => void;
+
+  toggleCandidateSelection: (placeId: string) => void;
+  clearCandidateSelection: () => void;
+  addCandidateGroupToDay: (dayIndex: number) => void;
+  confirmCandidate: (groupId: string, keepScheduleId: string) => void;
+  removeCandidateGroup: (groupId: string) => void;
 
   optimizeDayRoute: (dayIndex: number) => void;
   updateDayNotes: (dayIndex: number, notes: string) => void;
@@ -127,6 +134,7 @@ export const useAppStore = create<AppState>()(
         dayCount: initialDayCount,
         dayItineraries: initialItineraries,
         scheduledPlaces: [],
+        candidateSelectionIds: [],
 
         activeDayIndex: 0,
         isIngestModalOpen: false,
@@ -304,8 +312,68 @@ export const useAppStore = create<AppState>()(
         },
 
         removeScheduledPlace: (scheduleId) => {
+          set((state) => {
+            const removed = state.scheduledPlaces.find((s) => s.scheduleId === scheduleId);
+            let remaining = state.scheduledPlaces.filter((s) => s.scheduleId !== scheduleId);
+
+            // Removing a candidate down to a single survivor auto-confirms it - a lone
+            // "candidate" with nothing left to choose between isn't a candidate anymore.
+            if (removed?.groupId) {
+              const siblings = remaining.filter((s) => s.groupId === removed.groupId);
+              if (siblings.length === 1) {
+                remaining = remaining.map((s) =>
+                  s.scheduleId === siblings[0].scheduleId ? { ...s, groupId: undefined } : s
+                );
+              }
+            }
+
+            return { scheduledPlaces: remaining };
+          });
+        },
+
+        toggleCandidateSelection: (placeId) => {
           set((state) => ({
-            scheduledPlaces: state.scheduledPlaces.filter((s) => s.scheduleId !== scheduleId),
+            candidateSelectionIds: state.candidateSelectionIds.includes(placeId)
+              ? state.candidateSelectionIds.filter((id) => id !== placeId)
+              : [...state.candidateSelectionIds, placeId],
+          }));
+        },
+
+        clearCandidateSelection: () => set({ candidateSelectionIds: [] }),
+
+        addCandidateGroupToDay: (dayIndex) => {
+          set((state) => {
+            if (state.candidateSelectionIds.length < 2) return state;
+
+            const dayItems = state.scheduledPlaces.filter((s) => s.dayIndex === dayIndex);
+            const groupId = `group_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+            const newEntries: ScheduledPlace[] = state.candidateSelectionIds.map((placeId, idx) => ({
+              scheduleId: `sched_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`,
+              placeId,
+              dayIndex,
+              order: dayItems.length,
+              groupId,
+            }));
+
+            return {
+              scheduledPlaces: [...state.scheduledPlaces, ...newEntries],
+              activeDayIndex: dayIndex,
+              candidateSelectionIds: [],
+            };
+          });
+        },
+
+        confirmCandidate: (groupId, keepScheduleId) => {
+          set((state) => ({
+            scheduledPlaces: state.scheduledPlaces
+              .filter((s) => s.groupId !== groupId || s.scheduleId === keepScheduleId)
+              .map((s) => (s.scheduleId === keepScheduleId ? { ...s, groupId: undefined } : s)),
+          }));
+        },
+
+        removeCandidateGroup: (groupId) => {
+          set((state) => ({
+            scheduledPlaces: state.scheduledPlaces.filter((s) => s.groupId !== groupId),
           }));
         },
 

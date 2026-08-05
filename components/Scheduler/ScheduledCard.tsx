@@ -4,8 +4,8 @@ import React, { useEffect, useRef } from 'react';
 import { Place, ScheduledPlace } from '@/lib/types';
 import { useAppStore } from '@/lib/store';
 import { getDayColorTheme } from '@/lib/constants';
-import { validateScheduledPlace, calculateDistanceKm, estimateTravelTimeMinutes } from '@/lib/routeOptimizer';
-import { Trash2, AlertTriangle, Clock, Navigation, GripVertical, Coffee } from 'lucide-react';
+import { validateScheduledPlace } from '@/lib/routeOptimizer';
+import { Trash2, AlertTriangle, Clock, GripVertical, Coffee } from 'lucide-react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
@@ -13,14 +13,12 @@ interface ScheduledCardProps {
   scheduledPlace: ScheduledPlace;
   orderIndex: number;
   totalInDay: number;
-  nextScheduledPlace?: ScheduledPlace;
 }
 
 export default function ScheduledCard({
   scheduledPlace,
   orderIndex,
   totalInDay,
-  nextScheduledPlace,
 }: ScheduledCardProps) {
   const {
     places,
@@ -127,17 +125,6 @@ export default function ScheduledCard({
   const validationIssues = validateScheduledPlace(place, currentDayInfo.weekday, currentDayInfo.dateStr);
   const hasDayOffWarning = validationIssues.some((i) => i.type === 'DAY_OFF');
 
-  // Calculate distance to next place if available
-  let nextDistanceKm = 0;
-  let nextTravelMinutes = 0;
-  if (nextScheduledPlace) {
-    const nextPlace = places.find((p) => p.id === nextScheduledPlace.placeId);
-    if (nextPlace) {
-      nextDistanceKm = calculateDistanceKm(place.lat, place.lng, nextPlace.lat, nextPlace.lng);
-      nextTravelMinutes = estimateTravelTimeMinutes(nextDistanceKm);
-    }
-  }
-
   const style = {
     transform: CSS.Translate.toString(transform),
     transition,
@@ -237,19 +224,6 @@ export default function ScheduledCard({
           </div>
         )}
       </div>
-
-      {/* Travel Time/Distance to Next Place Connector */}
-      {nextScheduledPlace && nextDistanceKm > 0 && (
-        <div className="flex items-center justify-center my-0.5">
-          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-white rounded-full border border-slate-200 text-[10px] font-semibold text-slate-600 shadow-2xs">
-            <Navigation className="w-3 h-3 text-emerald-600" />
-            <span>다음 장소까지:</span>
-            <span className="text-blue-600 font-bold">{nextDistanceKm}km</span>
-            <span className="text-slate-300">•</span>
-            <span className="text-amber-600 font-bold">약 {nextTravelMinutes}분</span>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

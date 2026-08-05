@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS public.scheduled_places (
     item_type TEXT NOT NULL DEFAULT 'PLACE',
     break_label TEXT,
     break_duration_minutes INT,
+    group_id TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -58,6 +59,7 @@ ALTER TABLE public.scheduled_places ALTER COLUMN place_id DROP NOT NULL;
 ALTER TABLE public.scheduled_places ADD COLUMN IF NOT EXISTS item_type TEXT NOT NULL DEFAULT 'PLACE';
 ALTER TABLE public.scheduled_places ADD COLUMN IF NOT EXISTS break_label TEXT;
 ALTER TABLE public.scheduled_places ADD COLUMN IF NOT EXISTS break_duration_minutes INT;
+ALTER TABLE public.scheduled_places ADD COLUMN IF NOT EXISTS group_id TEXT;
 
 -- 4. Create Day Itineraries & Notes Table
 CREATE TABLE IF NOT EXISTS public.day_itineraries (

@@ -44,6 +44,7 @@ export default function NaverMapContainer({
   const naverMapInstance = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
   const polylinesRef = useRef<any[]>([]);
+  const legLabelsRef = useRef<any[]>([]);
 
   // Track initial fit bounds to preserve user's zoom & center position when adding schedules
   const hasInitialFitRef = useRef(false);
@@ -85,6 +86,7 @@ export default function NaverMapContainer({
 
   const [isLoaded, setIsLoaded] = useState(false);
   const [activeTab, setActiveTab] = useState<'ALL' | 'ACTIVE_DAY'>('ALL');
+  const [showLegDistances, setShowLegDistances] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [mapCustomDate, setMapCustomDate] = useState<string | null>(null);
   const [isAuthFailed, setIsAuthFailed] = useState(false);
@@ -149,7 +151,7 @@ export default function NaverMapContainer({
 
     for (let dayIdx = 0; dayIdx < dayCount; dayIdx++) {
       const daySchedules = scheduledPlaces
-        .filter((s) => s.dayIndex === dayIdx)
+        .filter((s) => s.dayIndex === dayIdx && !s.groupId) // undecided candidates aren't a committed stop yet
         .sort((a, b) => a.order - b.order);
 
       let totalDist = 0;
@@ -457,8 +459,10 @@ export default function NaverMapContainer({
     // Clear existing markers & polylines
     markersRef.current.forEach((m) => m.setMap(null));
     polylinesRef.current.forEach((p) => p.setMap(null));
+    legLabelsRef.current.forEach((m) => m.setMap(null));
     markersRef.current = [];
     polylinesRef.current = [];
+    legLabelsRef.current = [];
 
     const activeItinerary = dayItineraries.find((it) => it.dayIndex === activeDayIndex);
     const activeDateStr = activeItinerary?.dateStr || '';
@@ -559,16 +563,20 @@ export default function NaverMapContainer({
         continue;
       }
 
+      // Undecided candidate-group members aren't a committed stop, so they'd zigzag the
+      // route through every option instead of tracing an actual path.
       const daySchedules = scheduledPlaces
-        .filter((s) => s.dayIndex === dayIdx)
+        .filter((s) => s.dayIndex === dayIdx && !s.groupId)
         .sort((a, b) => a.order - b.order);
 
+      const legPlaces: Place[] = [];
       const pathCoords: any[] = [];
 
       daySchedules.forEach((sched) => {
         const place = placeMap.get(sched.placeId);
         if (place && place.lat && place.lng) {
           pathCoords.push(new window.naver.maps.LatLng(place.lat, place.lng));
+          legPlaces.push(place);
         }
       });
 
@@ -585,6 +593,39 @@ export default function NaverMapContainer({
         });
 
         polylinesRef.current.push(polyline);
+
+        // Per-leg distance/time labels - opt-in via the checkbox, and scoped to the
+        // selected day only so every other day's route doesn't clutter the map.
+        if (showLegDistances && dayIdx === activeDayIndex) {
+          for (let i = 0; i < legPlaces.length - 1; i++) {
+            const a = legPlaces[i];
+            const b = legPlaces[i + 1];
+            const distKm = calculateDistanceKm(a.lat, a.lng, b.lat, b.lng);
+            const minutes = estimateTravelTimeMinutes(distKm);
+            const midLat = (a.lat + b.lat) / 2;
+            const midLng = (a.lng + b.lng) / 2;
+
+            const legMarker = new window.naver.maps.Marker({
+              position: new window.naver.maps.LatLng(midLat, midLng),
+              map,
+              icon: {
+                content: `
+                  <div style="transform:translate(-50%, -50%); white-space:nowrap; pointer-events:none;">
+                    <div style="display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:9999px; background:#0f172a; color:#fff; font-size:10px; font-weight:800; box-shadow:0 2px 6px rgba(0,0,0,0.25); border:1px solid ${dayTheme.color};">
+                      <span style="color:#93c5fd;">${distKm}km</span>
+                      <span style="color:#64748b;">·</span>
+                      <span style="color:#fcd34d;">약 ${minutes}분</span>
+                    </div>
+                  </div>
+                `,
+                size: new window.naver.maps.Size(0, 0),
+                anchor: new window.naver.maps.Point(0, 0),
+              },
+            });
+
+            legLabelsRef.current.push(legMarker);
+          }
+        }
       }
     }
   }, [
@@ -598,6 +639,7 @@ export default function NaverMapContainer({
     placeMap,
     setSelectedPlaceId,
     effectiveDateStr,
+    showLegDistances,
   ]);
 
   const activeWeekdayLabel = activeItinerary?.weekdayLabel || '';
@@ -820,6 +862,15 @@ export default function NaverMapContainer({
             <Navigation className="w-4 h-4 text-emerald-600 shrink-0" />
             <span>선택 일차 ({activeDayIndex + 1}일차 - {activeDateStr} {activeWeekdayLabel}) 이동 요약:</span>
           </div>
+          <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-600 cursor-pointer select-none shrink-0">
+            <input
+              type="checkbox"
+              checked={showLegDistances}
+              onChange={(e) => setShowLegDistances(e.target.checked)}
+              className="w-3.5 h-3.5 accent-emerald-600 cursor-pointer"
+            />
+            <span>구간별 거리·시간 표시</span>
+          </label>
           <div className="flex items-center gap-2 font-extrabold text-slate-900 text-xs flex-wrap">
             <span className="bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
               장소: <strong className="text-emerald-700">{daySummaries[activeDayIndex]?.count || 0}곳</strong>

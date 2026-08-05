@@ -408,7 +408,7 @@ export default function Home() {
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="flex flex-col h-full min-h-screen w-screen bg-slate-100 overflow-y-auto md:h-screen md:overflow-hidden font-sans">
+      <div id="app-root" className="flex flex-col h-full min-h-screen w-screen bg-slate-100 overflow-y-auto md:h-screen md:overflow-hidden font-sans">
         {/* Top Navigation Header */}
         <Header />
 

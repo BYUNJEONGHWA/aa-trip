@@ -40,10 +40,26 @@ export default function ExportModal() {
       if (daySchedules.length === 0) {
         fullText += `  - 등록된 일정이 없습니다.\n`;
       } else {
-        daySchedules.forEach((s, idx) => {
+        let visibleIdx = 0;
+        const seenGroupIds = new Set<string>();
+        daySchedules.forEach((s) => {
+          if (s.groupId) {
+            if (seenGroupIds.has(s.groupId)) return;
+            seenGroupIds.add(s.groupId);
+            const candidateNames = daySchedules
+              .filter((c) => c.groupId === s.groupId)
+              .map((c) => places.find((p) => p.id === c.placeId)?.name)
+              .filter((name): name is string => !!name);
+            fullText += `  ${++visibleIdx}. 🤔 후보: ${candidateNames.join(' / ')}\n`;
+            return;
+          }
+          if (s.type === 'BREAK') {
+            fullText += `  ${++visibleIdx}. ☕ ${s.breakLabel || '휴식'}\n`;
+            return;
+          }
           const p = places.find((place) => place.id === s.placeId);
           if (p) {
-            fullText += `  ${idx + 1}. ${p.name} (${p.category}) - ${p.operatingHours.display}\n`;
+            fullText += `  ${++visibleIdx}. ${p.name} (${p.category}) - ${p.operatingHours.display}\n`;
           }
         });
       }
@@ -185,6 +201,33 @@ export default function ExportModal() {
               .filter((s) => s.dayIndex === it.dayIndex)
               .sort((a, b) => a.order - b.order);
 
+            // Collapse candidate-group members into one row, same as the scheduler view -
+            // otherwise each candidate prints as if it were a confirmed stop. BREAK items
+            // get their own row instead of being silently skipped (which used to leave
+            // gaps in the numbering, since the place lookup for a break always fails).
+            type PrintItem =
+              | { kind: 'place'; schedule: (typeof daySchedules)[number] }
+              | { kind: 'break'; schedule: (typeof daySchedules)[number] }
+              | { kind: 'group'; groupId: string; candidates: typeof daySchedules };
+
+            const printItems: PrintItem[] = [];
+            const seenGroupIds = new Set<string>();
+            daySchedules.forEach((s) => {
+              if (s.groupId) {
+                if (seenGroupIds.has(s.groupId)) return;
+                seenGroupIds.add(s.groupId);
+                printItems.push({
+                  kind: 'group',
+                  groupId: s.groupId,
+                  candidates: daySchedules.filter((c) => c.groupId === s.groupId),
+                });
+              } else if (s.type === 'BREAK') {
+                printItems.push({ kind: 'break', schedule: s });
+              } else {
+                printItems.push({ kind: 'place', schedule: s });
+              }
+            });
+
             return (
               <div
                 key={it.dayIndex}
@@ -204,16 +247,54 @@ export default function ExportModal() {
                     </h3>
                   </div>
                   <span className="text-xs text-slate-400 font-semibold">
-                    방문 장소: {daySchedules.length}곳
+                    방문 장소: {printItems.filter((i) => i.kind !== 'break').length}곳
                   </span>
                 </div>
 
                 {/* Places */}
-                {daySchedules.length === 0 ? (
+                {printItems.length === 0 ? (
                   <p className="text-xs text-slate-500 italic py-2">등록된 장소가 없습니다.</p>
                 ) : (
                   <div className="space-y-2">
-                    {daySchedules.map((s, idx) => {
+                    {printItems.map((item, idx) => {
+                      if (item.kind === 'break') {
+                        return (
+                          <div
+                            key={item.schedule.scheduleId}
+                            className="p-3 rounded-xl border border-dashed border-amber-500/50 bg-amber-950/20 flex items-center gap-3 text-xs text-amber-200"
+                          >
+                            <span
+                              className="w-5 h-5 rounded-full text-white text-[11px] font-black flex items-center justify-center shrink-0"
+                              style={{ backgroundColor: theme.color }}
+                            >
+                              {idx + 1}
+                            </span>
+                            <span className="font-bold">☕ {item.schedule.breakLabel || '휴식'}</span>
+                          </div>
+                        );
+                      }
+
+                      if (item.kind === 'group') {
+                        const candidateNames = item.candidates
+                          .map((c) => places.find((p) => p.id === c.placeId)?.name)
+                          .filter((name): name is string => !!name);
+                        return (
+                          <div
+                            key={item.groupId}
+                            className="p-3 rounded-xl border border-dashed border-violet-500/50 bg-violet-950/20 flex items-center gap-3 text-xs text-violet-200"
+                          >
+                            <span
+                              className="w-5 h-5 rounded-full text-white text-[11px] font-black flex items-center justify-center shrink-0"
+                              style={{ backgroundColor: theme.color }}
+                            >
+                              {idx + 1}
+                            </span>
+                            <span className="font-bold">🤔 후보: {candidateNames.join(' / ')}</span>
+                          </div>
+                        );
+                      }
+
+                      const s = item.schedule;
                       const p = places.find((place) => place.id === s.placeId);
                       if (!p) return null;
                       const issues = validateScheduledPlace(p, it.weekday);

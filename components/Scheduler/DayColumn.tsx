@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { DayItinerary } from '@/lib/types';
 import { useAppStore } from '@/lib/store';
 import { getDayColorTheme } from '@/lib/constants';
@@ -45,6 +45,17 @@ export default function DayColumn({ itinerary }: DayColumnProps) {
   const isActive = activeDayIndex === itinerary.dayIndex;
   const isHighlightedDrop = isOver;
 
+  const columnRef = useRef<HTMLDivElement | null>(null);
+
+  // Jump to this day's column when it becomes the selected day - e.g. clicking "2일차"
+  // while looking at day 3 used to just highlight day 2's border, leaving the user to
+  // scroll there manually.
+  useEffect(() => {
+    if (isActive && columnRef.current) {
+      columnRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+    }
+  }, [isActive]);
+
   // Scheduled items for this specific day, sorted by order
   const daySchedules = scheduledPlaces
     .filter((s) => s.dayIndex === itinerary.dayIndex)
@@ -69,6 +80,7 @@ export default function DayColumn({ itinerary }: DayColumnProps) {
 
   return (
     <div
+      ref={columnRef}
       onClick={() => setActiveDayIndex(itinerary.dayIndex)}
       className={`w-full md:w-80 flex-shrink-0 bg-white rounded-2xl border flex flex-col h-auto md:h-full overflow-hidden transition-all shadow-md ${
         isHighlightedDrop

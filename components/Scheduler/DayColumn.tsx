@@ -35,6 +35,8 @@ export default function DayColumn({ itinerary }: DayColumnProps) {
     dayCount,
     activeDayIndex,
     setActiveDayIndex,
+    candidateSelectionIds,
+    groupSelectedSchedules,
   } = useAppStore();
 
   const { setNodeRef, isOver } = useDroppable({
@@ -64,6 +66,10 @@ export default function DayColumn({ itinerary }: DayColumnProps) {
 
   const breakCount = daySchedules.filter((s) => s.type === 'BREAK').length;
   const placeCount = daySchedules.length - breakCount;
+
+  const selectedInThisDay = candidateSelectionIds.filter((id) =>
+    daySchedules.some((s) => s.scheduleId === id)
+  ).length;
 
   // Collapse candidate-group members (2+ scheduled places sharing a groupId, awaiting a
   // pick) into a single visual slot rendered by CandidateGroupCard. Everything else
@@ -205,6 +211,24 @@ export default function DayColumn({ itinerary }: DayColumnProps) {
           )}
         </div>
       </div>
+
+      {/* Candidate Group Selection Bar - appears once 1+ scheduled cards in this day are picked */}
+      {selectedInThisDay > 0 && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="px-3.5 py-2 bg-violet-50 border-b border-violet-200 flex items-center justify-between gap-2 text-xs shrink-0"
+        >
+          <span className="font-black text-violet-800">{selectedInThisDay}곳 선택됨</span>
+          <button
+            onClick={() => groupSelectedSchedules(itinerary.dayIndex)}
+            disabled={selectedInThisDay < 2}
+            className="px-2.5 py-1 rounded-lg bg-violet-600 hover:bg-violet-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-[11px] font-black transition-colors whitespace-nowrap"
+            title={selectedInThisDay < 2 ? '2곳 이상 선택해주세요' : '선택한 항목을 후보그룹으로 묶기'}
+          >
+            선택한 항목 후보로 묶기
+          </button>
+        </div>
+      )}
 
       {/* Scheduled Card List Area - Droppable & Sortable */}
       <div

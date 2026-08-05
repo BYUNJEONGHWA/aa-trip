@@ -65,9 +65,9 @@ interface AppState {
   reorderDaySchedule: (dayIndex: number, activeScheduleId: string, overScheduleId: string) => void;
   moveScheduleToDay: (scheduleId: string, targetDayIndex: number) => void;
 
-  toggleCandidateSelection: (placeId: string) => void;
+  toggleScheduleSelection: (scheduleId: string) => void;
   clearCandidateSelection: () => void;
-  addCandidateGroupToDay: (dayIndex: number) => void;
+  groupSelectedSchedules: (dayIndex: number) => void;
   confirmCandidate: (groupId: string, keepScheduleId: string) => void;
   removeCandidateGroup: (groupId: string) => void;
 
@@ -331,33 +331,42 @@ export const useAppStore = create<AppState>()(
           });
         },
 
-        toggleCandidateSelection: (placeId) => {
-          set((state) => ({
-            candidateSelectionIds: state.candidateSelectionIds.includes(placeId)
-              ? state.candidateSelectionIds.filter((id) => id !== placeId)
-              : [...state.candidateSelectionIds, placeId],
-          }));
+        // Selection holds scheduleIds of already-scheduled cards, picked from within one
+        // day's list to be merged into a candidate group. Picking one from a different
+        // day than the current selection restarts the selection there instead of mixing
+        // schedules across days into one slot.
+        toggleScheduleSelection: (scheduleId) => {
+          set((state) => {
+            if (state.candidateSelectionIds.includes(scheduleId)) {
+              return { candidateSelectionIds: state.candidateSelectionIds.filter((id) => id !== scheduleId) };
+            }
+
+            const item = state.scheduledPlaces.find((s) => s.scheduleId === scheduleId);
+            if (!item) return state;
+
+            const firstSelected = state.scheduledPlaces.find((s) => s.scheduleId === state.candidateSelectionIds[0]);
+            const sameDay = !firstSelected || firstSelected.dayIndex === item.dayIndex;
+
+            return {
+              candidateSelectionIds: sameDay ? [...state.candidateSelectionIds, scheduleId] : [scheduleId],
+            };
+          });
         },
 
         clearCandidateSelection: () => set({ candidateSelectionIds: [] }),
 
-        addCandidateGroupToDay: (dayIndex) => {
+        groupSelectedSchedules: (dayIndex) => {
           set((state) => {
-            if (state.candidateSelectionIds.length < 2) return state;
+            const idsInDay = state.candidateSelectionIds.filter(
+              (id) => state.scheduledPlaces.find((s) => s.scheduleId === id)?.dayIndex === dayIndex
+            );
+            if (idsInDay.length < 2) return state;
 
-            const dayItems = state.scheduledPlaces.filter((s) => s.dayIndex === dayIndex);
             const groupId = `group_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-            const newEntries: ScheduledPlace[] = state.candidateSelectionIds.map((placeId, idx) => ({
-              scheduleId: `sched_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`,
-              placeId,
-              dayIndex,
-              order: dayItems.length,
-              groupId,
-            }));
-
             return {
-              scheduledPlaces: [...state.scheduledPlaces, ...newEntries],
-              activeDayIndex: dayIndex,
+              scheduledPlaces: state.scheduledPlaces.map((s) =>
+                idsInDay.includes(s.scheduleId) ? { ...s, groupId } : s
+              ),
               candidateSelectionIds: [],
             };
           });

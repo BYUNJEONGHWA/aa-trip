@@ -5,7 +5,7 @@ import { Place, ScheduledPlace } from '@/lib/types';
 import { useAppStore } from '@/lib/store';
 import { getDayColorTheme } from '@/lib/constants';
 import { validateScheduledPlace } from '@/lib/routeOptimizer';
-import { Trash2, AlertTriangle, Clock, GripVertical, Coffee } from 'lucide-react';
+import { Trash2, AlertTriangle, Clock, GripVertical, Coffee, CheckSquare, Square } from 'lucide-react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
@@ -28,6 +28,8 @@ export default function ScheduledCard({
     selectedPlaceId,
     setSelectedPlaceId,
     setFocusPlaceLocation,
+    candidateSelectionIds,
+    toggleScheduleSelection,
   } = useAppStore();
   const cardRef = useRef<HTMLDivElement | null>(null);
 
@@ -59,6 +61,7 @@ export default function ScheduledCard({
   });
 
   const isSelected = selectedPlaceId === place?.id;
+  const isCandidateSelected = candidateSelectionIds.includes(scheduledPlace.scheduleId);
 
   // Auto-scroll scheduled place card into view when marker is clicked on map
   useEffect(() => {
@@ -146,6 +149,8 @@ export default function ScheduledCard({
         className={`bg-white rounded-xl p-3 border cursor-pointer transition-all duration-200 ${
           isSelected
             ? 'ring-4 ring-emerald-500/50 border-emerald-500 bg-emerald-50/90 shadow-md scale-[1.01] z-10'
+            : isCandidateSelected
+            ? 'ring-4 ring-violet-400/50 border-violet-400 bg-violet-50/70 shadow-md'
             : hasDayOffWarning
             ? 'border-rose-300 bg-rose-50/80 ring-2 ring-rose-400/20 shadow-xs'
             : 'border-slate-200 hover:border-slate-300 shadow-xs'
@@ -177,13 +182,30 @@ export default function ScheduledCard({
             </h4>
           </div>
 
-          <button
-            onClick={() => removeScheduledPlace(scheduledPlace.scheduleId)}
-            className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors shrink-0"
-            title="일정에서 삭제"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
+          <div className="flex items-center gap-0.5 shrink-0">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleScheduleSelection(scheduledPlace.scheduleId);
+              }}
+              className={`w-6 h-6 rounded flex items-center justify-center transition-colors ${
+                isCandidateSelected
+                  ? 'text-violet-600 bg-violet-100 hover:bg-violet-200'
+                  : 'text-slate-300 hover:text-violet-600 hover:bg-violet-50'
+              }`}
+              title="후보그룹으로 묶을 항목 선택"
+            >
+              {isCandidateSelected ? <CheckSquare className="w-3.5 h-3.5" /> : <Square className="w-3.5 h-3.5" />}
+            </button>
+
+            <button
+              onClick={() => removeScheduledPlace(scheduledPlace.scheduleId)}
+              className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+              title="일정에서 삭제"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
 
         {/* Operating Hours & Category info */}

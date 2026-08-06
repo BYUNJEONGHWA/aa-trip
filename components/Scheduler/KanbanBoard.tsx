@@ -1,13 +1,43 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useAppStore } from '@/lib/store';
 import DayColumn from './DayColumn';
-import { Plus, Calendar, Layers } from 'lucide-react';
+import { Plus, Calendar, Layers, ChevronLeft, ChevronRight } from 'lucide-react';
+
+// One day column's width (md:w-80 = 320px) plus the gap-4 (16px) between columns.
+const SCROLL_STEP_PX = 336;
 
 export default function KanbanBoard() {
   const { dayItineraries, addDay, activeDayIndex, setActiveDayIndex } = useAppStore();
   const [mobileViewMode, setMobileViewMode] = useState<'SINGLE' | 'STACKED'>('SINGLE');
+
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const updateScrollButtons = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 4);
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+  }, []);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    updateScrollButtons();
+    el.addEventListener('scroll', updateScrollButtons);
+    window.addEventListener('resize', updateScrollButtons);
+    return () => {
+      el.removeEventListener('scroll', updateScrollButtons);
+      window.removeEventListener('resize', updateScrollButtons);
+    };
+  }, [updateScrollButtons, dayItineraries.length]);
+
+  const scrollByStep = (direction: 1 | -1) => {
+    scrollRef.current?.scrollBy({ left: direction * SCROLL_STEP_PX, behavior: 'smooth' });
+  };
 
   return (
     <div className="w-full h-auto md:h-full md:min-h-0 flex flex-col overflow-visible md:overflow-hidden select-none bg-slate-100/50 relative">
@@ -89,35 +119,60 @@ export default function KanbanBoard() {
         straight through) when it should show, or `hidden md:contents` when it should only
         show at the desktop breakpoint.
       */}
-      <div className="w-full flex-1 md:min-h-0 overflow-x-hidden md:overflow-x-auto md:overflow-y-hidden p-3 sm:p-4 flex flex-col md:flex-row gap-4 items-start pb-24 md:pb-6 touch-pan-y">
-        {dayItineraries.map((itinerary) => {
-          const showOnMobile = mobileViewMode === 'STACKED' || itinerary.dayIndex === activeDayIndex;
-          return (
-            <div key={itinerary.dayIndex} className={showOnMobile ? 'contents' : 'hidden md:contents'}>
-              <DayColumn itinerary={itinerary} />
+      <div className="relative flex-1 min-h-0">
+        <div
+          ref={scrollRef}
+          className="w-full h-full md:min-h-0 overflow-x-hidden md:overflow-x-auto md:overflow-y-hidden p-3 sm:p-4 flex flex-col md:flex-row gap-4 items-start pb-24 md:pb-6 touch-pan-y scroll-smooth"
+        >
+          {dayItineraries.map((itinerary) => {
+            const showOnMobile = mobileViewMode === 'STACKED' || itinerary.dayIndex === activeDayIndex;
+            return (
+              <div key={itinerary.dayIndex} className={showOnMobile ? 'contents' : 'hidden md:contents'}>
+                <DayColumn itinerary={itinerary} />
+              </div>
+            );
+          })}
+
+          {/* Add Day Card on Mobile */}
+          <button
+            onClick={addDay}
+            className="md:hidden w-full py-4 border-2 border-dashed border-emerald-300 hover:border-emerald-500 rounded-2xl flex items-center justify-center gap-2 text-emerald-700 bg-emerald-50/60 hover:bg-emerald-100/60 transition-all cursor-pointer shadow-2xs font-black text-xs min-h-[52px]"
+          >
+            <Plus className="w-4 h-4 text-emerald-600 stroke-[3]" />
+            <span>+ 새로운 일차 추가하기 (DAY {dayItineraries.length + 1})</span>
+          </button>
+
+          {/* Add Day Card on Desktop */}
+          <button
+            onClick={addDay}
+            className="hidden md:flex w-48 h-32 shrink-0 border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl flex-col items-center justify-center gap-2 text-slate-500 hover:text-emerald-700 bg-white hover:bg-emerald-50/50 transition-all cursor-pointer group shadow-xs"
+          >
+            <div className="w-8 h-8 rounded-full bg-slate-100 group-hover:bg-emerald-100 flex items-center justify-center transition-all">
+              <Plus className="w-5 h-5 text-slate-500 group-hover:text-emerald-600" />
             </div>
-          );
-        })}
+            <span className="text-xs font-bold">일차 추가하기</span>
+          </button>
+        </div>
 
-        {/* Add Day Card on Mobile */}
-        <button
-          onClick={addDay}
-          className="md:hidden w-full py-4 border-2 border-dashed border-emerald-300 hover:border-emerald-500 rounded-2xl flex items-center justify-center gap-2 text-emerald-700 bg-emerald-50/60 hover:bg-emerald-100/60 transition-all cursor-pointer shadow-2xs font-black text-xs min-h-[52px]"
-        >
-          <Plus className="w-4 h-4 text-emerald-600 stroke-[3]" />
-          <span>+ 새로운 일차 추가하기 (DAY {dayItineraries.length + 1})</span>
-        </button>
-
-        {/* Add Day Card on Desktop */}
-        <button
-          onClick={addDay}
-          className="hidden md:flex w-48 h-32 shrink-0 border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl flex-col items-center justify-center gap-2 text-slate-500 hover:text-emerald-700 bg-white hover:bg-emerald-50/50 transition-all cursor-pointer group shadow-xs"
-        >
-          <div className="w-8 h-8 rounded-full bg-slate-100 group-hover:bg-emerald-100 flex items-center justify-center transition-all">
-            <Plus className="w-5 h-5 text-slate-500 group-hover:text-emerald-600" />
-          </div>
-          <span className="text-xs font-bold">일차 추가하기</span>
-        </button>
+        {/* Desktop-only smooth horizontal nav arrows, replacing manual scroll/trackpad */}
+        {canScrollLeft && (
+          <button
+            onClick={() => scrollByStep(-1)}
+            className="hidden md:flex absolute left-1 top-1/2 -translate-y-1/2 z-20 w-9 h-9 rounded-full bg-white hover:bg-emerald-50 text-slate-600 hover:text-emerald-700 border border-slate-200 shadow-lg items-center justify-center transition-all active:scale-95"
+            title="이전 일차 보기"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+        )}
+        {canScrollRight && (
+          <button
+            onClick={() => scrollByStep(1)}
+            className="hidden md:flex absolute right-1 top-1/2 -translate-y-1/2 z-20 w-9 h-9 rounded-full bg-white hover:bg-emerald-50 text-slate-600 hover:text-emerald-700 border border-slate-200 shadow-lg items-center justify-center transition-all active:scale-95"
+            title="다음 일차 보기"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
+        )}
       </div>
     </div>
   );

@@ -496,7 +496,7 @@ export default function NaverMapContainer({
         `;
       } else if (scheduledDayIdx >= 0) {
         statusBadgeHtml = `
-          <div style="margin-top:2px; font-size:10px; font-weight:800; color:${dayTheme?.color}; background:#ffffff; border:1px solid ${dayTheme?.color}; padding:1px 5px; border-radius:4px; white-space:nowrap; width:max-content; word-break:keep-all;">
+          <div style="margin-top:2px; font-size:10px; font-weight:800; color:#000000; background:#ffffff; border:2px solid ${dayTheme?.color}; padding:1px 5px; border-radius:4px; white-space:nowrap; width:max-content; word-break:keep-all;">
             ${scheduledDayIdx + 1}일차 ${firstSchedule.order + 1}번째
           </div>
         `;

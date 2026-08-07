@@ -240,7 +240,11 @@ export default function TripFolderTabs() {
       await supabase.from('trips').delete().eq('id', tripId);
       if (tripId === activeTripId) {
         const loaded = await loadTripFromSupabase('aa_trip_main');
-        setActiveTrip('aa_trip_main', '스마트 광주 여행');
+        // Use the DB's actual current title, not this hardcoded placeholder — falling
+        // back to it unconditionally overwrote every real rename of aa_trip_main the
+        // next time this ran, since the auto-save effect in app/page.tsx watches
+        // activeTripTitle and persists whatever it's set to right after.
+        setActiveTrip('aa_trip_main', loaded?.title || '스마트 광주 여행');
         if (loaded) {
           loadFullTripState({
             startDate: loaded.startDate || '2026-08-16',

@@ -408,7 +408,7 @@ export default function Home() {
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div id="app-root" className="flex flex-col h-full min-h-screen w-screen bg-slate-100 overflow-y-auto md:h-screen md:overflow-hidden font-sans">
+      <div id="app-root" className="flex flex-col h-full min-h-screen w-screen bg-slate-100 overflow-y-auto pb-16 md:pb-0 md:h-screen md:overflow-hidden font-sans">
         {/* Top Navigation Header */}
         <Header />
 
@@ -455,8 +455,9 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Mobile Bottom Navigation Bar (< 768px) */}
-        <div className="md:hidden flex items-center justify-around bg-white border-t border-slate-200 py-2 px-3 shadow-lg z-30 shrink-0">
+        {/* Mobile Bottom Navigation Bar (< 768px) — fixed so it's always reachable even
+            when the active view (e.g. 80+ archived places) scrolls far past one screen. */}
+        <div className="md:hidden fixed bottom-0 inset-x-0 flex items-center justify-around bg-white border-t border-slate-200 py-2 px-3 shadow-lg z-30">
           <button
             onClick={() => setMobileActiveView('PLACES')}
             className={`flex flex-col items-center gap-1 min-h-[44px] justify-center px-4 py-1 rounded-xl text-xs font-black transition-all ${

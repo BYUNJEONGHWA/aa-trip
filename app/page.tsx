@@ -10,6 +10,7 @@ import DataIngestionModal from '@/components/Modals/DataIngestionModal';
 import ExportModal from '@/components/Modals/ExportModal';
 import PlaceSearchModal from '@/components/Modals/PlaceSearchModal';
 import SupabaseSyncModal from '@/components/Modals/SupabaseSyncModal';
+import FolderPasswordGate from '@/components/Modals/FolderPasswordGate';
 import PlaceCard from '@/components/PlaceCard';
 import ScheduledCard from '@/components/Scheduler/ScheduledCard';
 import { useAppStore } from '@/lib/store';
@@ -500,6 +501,7 @@ export default function Home() {
         <ExportModal />
         <PlaceSearchModal />
         <SupabaseSyncModal />
+        <FolderPasswordGate />
 
         {/* Floating Drag Overlay */}
         <DragOverlay>

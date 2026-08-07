@@ -13,6 +13,12 @@ CREATE TABLE IF NOT EXISTS public.trips (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Optional per-folder soft lock. SHA-256 hex hash, never the plaintext password.
+-- Enforced client-side only (RLS below allows public read/write to the anon key
+-- regardless) -- this deters casual browsing by someone with the URL, not a
+-- determined bypass.
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS folder_password_hash TEXT;
+
 -- 2. Create Places Library Table
 CREATE TABLE IF NOT EXISTS public.places (
     id TEXT PRIMARY KEY,

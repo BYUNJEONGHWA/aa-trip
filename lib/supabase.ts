@@ -52,6 +52,38 @@ export async function updateTripTitleInSupabase(tripId: string, title: string) {
 }
 
 /**
+ * Set/change/clear a folder's password. Pass null to remove the lock.
+ * Does NOT bump updated_at — this isn't trip content, and touching that stamp
+ * would make every other open tab's cross-device poller reload for no reason.
+ */
+export async function updateTripPasswordInSupabase(tripId: string, passwordHash: string | null) {
+  if (!supabase) return false;
+  const { error } = await supabase
+    .from('trips')
+    .update({ folder_password_hash: passwordHash })
+    .eq('id', tripId);
+  if (error) {
+    console.warn('Update trip password error:', error.message);
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Cheap single-column check, used to gate a folder before its full content loads.
+ */
+export async function fetchTripPasswordHash(tripId: string): Promise<string | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('trips')
+    .select('folder_password_hash')
+    .eq('id', tripId)
+    .single();
+  if (error || !data) return null;
+  return data.folder_password_hash || null;
+}
+
+/**
  * Serializes saves. saveTripToSupabase is "DELETE all rows for this trip, then INSERT
  * the current set" — which is only correct if it never interleaves with itself. Two
  * concurrent saves run as DELETE, DELETE, INSERT, INSERT and leave EVERY schedule row
@@ -364,7 +396,7 @@ export async function loadTripFromSupabase(tripId: string): Promise<SavedTripPay
  */
 export async function fetchAllTripsFromSupabase() {
   if (!supabase) return [];
-  const { data, error } = await supabase.from('trips').select('id, title, start_date, day_count, updated_at').order('updated_at', { ascending: false });
+  const { data, error } = await supabase.from('trips').select('id, title, start_date, day_count, updated_at, folder_password_hash').order('updated_at', { ascending: false });
   if (error) {
     console.warn('Fetch trips error:', error.message);
     return [];

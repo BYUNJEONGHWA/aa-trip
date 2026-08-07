@@ -7,11 +7,13 @@ import {
   loadTripFromSupabase,
   saveTripToSupabase,
   updateTripTitleInSupabase,
+  updateTripPasswordInSupabase,
   subscribeToTripChanges,
   isSupabaseConfigured,
   supabase,
 } from '@/lib/supabase';
-import { Folder, Plus, Trash2, CheckCircle2, RefreshCw, Edit2, Check, X } from 'lucide-react';
+import { hashFolderPassword, isFolderUnlocked, markFolderUnlocked } from '@/lib/folderLock';
+import { Folder, Plus, Trash2, CheckCircle2, RefreshCw, Edit2, Check, X, Lock, KeyRound } from 'lucide-react';
 
 export default function TripFolderTabs() {
   const {
@@ -37,6 +39,11 @@ export default function TripFolderTabs() {
   // Inline Folder Rename state
   const [editingTripId, setEditingTripId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
+
+  // Inline Folder Password-Unlock state (folder has a password & isn't unlocked yet this session)
+  const [unlockingTrip, setUnlockingTrip] = useState<any>(null);
+  const [unlockInput, setUnlockInput] = useState('');
+  const [unlockError, setUnlockError] = useState('');
 
   // autoSaveStatus comes from the store, written by the single auto-saver in app/page.tsx
 
@@ -88,10 +95,7 @@ export default function TripFolderTabs() {
   // below. Saves are additionally serialized in lib/supabase.ts.
 
   // Switch Active Trip Folder with isolated places/schedules
-  const handleSelectTrip = async (trip: any) => {
-    if (editingTripId) return; // Ignore switch if currently editing
-    if (trip.id === activeTripId) return;
-
+  const switchToTrip = async (trip: any) => {
     try {
       const loaded = await loadTripFromSupabase(trip.id);
       const targetTitle = loaded?.title || trip.title || '여행 일정';
@@ -109,6 +113,50 @@ export default function TripFolderTabs() {
     } catch (e) {
       console.warn('Load trip failed:', e);
     }
+  };
+
+  const handleSelectTrip = async (trip: any) => {
+    if (editingTripId) return; // Ignore switch if currently editing
+    if (trip.id === activeTripId) return;
+
+    if (trip.folder_password_hash && !isFolderUnlocked(trip.id)) {
+      setUnlockingTrip(trip);
+      setUnlockInput('');
+      setUnlockError('');
+      return;
+    }
+
+    await switchToTrip(trip);
+  };
+
+  const handleUnlockSubmit = async () => {
+    if (!unlockingTrip) return;
+    const inputHash = await hashFolderPassword(unlockInput);
+    if (inputHash !== unlockingTrip.folder_password_hash) {
+      setUnlockError('비밀번호가 일치하지 않습니다.');
+      return;
+    }
+    markFolderUnlocked(unlockingTrip.id);
+    const trip = unlockingTrip;
+    setUnlockingTrip(null);
+    await switchToTrip(trip);
+  };
+
+  // Set / change / remove a folder's password. Native prompt keeps this consistent
+  // with the existing delete-folder confirm() — it's an infrequent admin action, not
+  // the primary flow, so a full modal would be overkill.
+  const handleSetPassword = async (trip: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const input = window.prompt(
+      `'${trip.title}' 폴더의 비밀번호를 입력하세요.\n(비워두고 확인을 누르면 잠금이 해제됩니다)`,
+      ''
+    );
+    if (input === null) return; // cancelled
+
+    const newHash = input.trim() ? await hashFolderPassword(input.trim()) : null;
+    const ok = await updateTripPasswordInSupabase(trip.id, newHash);
+    if (ok && newHash) markFolderUnlocked(trip.id); // setting it yourself shouldn't lock you out
+    await loadTripsList();
   };
 
   // Create New Trip Folder (Clean isolated state)
@@ -224,6 +272,43 @@ export default function TripFolderTabs() {
         {defaultTrips.map((t) => {
           const isActive = t.id === activeTripId;
           const isEditing = t.id === editingTripId;
+          const isUnlocking = t.id === unlockingTrip?.id;
+
+          if (isUnlocking) {
+            return (
+              <div key={t.id} className="flex items-center gap-1 bg-slate-50 border border-slate-300 p-1 rounded-lg shrink-0">
+                <Lock className="w-3 h-3 text-slate-500 ml-1" />
+                <input
+                  type="password"
+                  value={unlockInput}
+                  onChange={(e) => {
+                    setUnlockInput(e.target.value);
+                    setUnlockError('');
+                  }}
+                  onKeyDown={(e) => e.key === 'Enter' && handleUnlockSubmit()}
+                  placeholder="비밀번호"
+                  autoFocus
+                  className={`px-2 py-0.5 text-xs font-black bg-white border rounded outline-none text-slate-900 w-28 ${
+                    unlockError ? 'border-rose-400' : 'border-slate-300'
+                  }`}
+                />
+                <button
+                  onClick={handleUnlockSubmit}
+                  className="p-1 bg-emerald-600 text-white rounded hover:bg-emerald-700"
+                  title="잠금 해제"
+                >
+                  <KeyRound className="w-3 h-3" />
+                </button>
+                <button
+                  onClick={() => setUnlockingTrip(null)}
+                  className="p-1 text-slate-500 rounded hover:bg-slate-200"
+                  title="취소"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            );
+          }
 
           if (isEditing) {
             return (
@@ -275,6 +360,9 @@ export default function TripFolderTabs() {
             >
               <Folder className={`w-3 h-3 ${isActive ? 'text-amber-300' : 'text-slate-500'}`} />
               <span>{t.title || '여행 폴더'}</span>
+              {t.folder_password_hash && (
+                <Lock className={`w-3 h-3 ${isActive ? 'text-amber-300' : 'text-slate-400'}`} />
+              )}
 
               <button
                 onClick={(e) => startRenameTrip(t.id, t.title, e)}
@@ -286,6 +374,18 @@ export default function TripFolderTabs() {
                 title="폴더 이름 변경"
               >
                 <Edit2 className="w-3 h-3" />
+              </button>
+
+              <button
+                onClick={(e) => handleSetPassword(t, e)}
+                className={`p-1 rounded transition-opacity ${
+                  isActive
+                    ? 'hover:bg-slate-800 text-slate-300 opacity-90'
+                    : 'hover:bg-slate-300 text-slate-500 opacity-70 group-hover:opacity-100'
+                }`}
+                title={t.folder_password_hash ? '폴더 비밀번호 변경/해제' : '폴더 비밀번호 설정'}
+              >
+                <KeyRound className="w-3 h-3" />
               </button>
 
               {t.id !== 'aa_trip_main' && (

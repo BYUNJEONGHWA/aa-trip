@@ -62,6 +62,37 @@ export default function Home() {
   const [mapViewState, setMapViewState] = useState<'NORMAL' | 'MINIMIZED' | 'MAXIMIZED'>('NORMAL');
   const [mobileActiveView, setMobileActiveView] = useState<'PLACES' | 'SCHEDULER' | 'MAP'>('SCHEDULER');
 
+  // Mobile swipe between the 보관 장소 / 스케줄러 / 네이버 지도 tabs, as an alternative to
+  // tapping the bottom nav. Only acts on a clean, mostly-horizontal, decisive swipe so it
+  // doesn't fight the scheduler's drag-and-drop or the map's own pan/pinch gestures.
+  const MOBILE_VIEW_ORDER: Array<'PLACES' | 'SCHEDULER' | 'MAP'> = ['PLACES', 'SCHEDULER', 'MAP'];
+  const touchStartRef = React.useRef<{ x: number; y: number } | null>(null);
+
+  const handleWorkspaceTouchStart = (e: React.TouchEvent) => {
+    if (window.innerWidth >= 768) return;
+    const t = e.touches[0];
+    touchStartRef.current = { x: t.clientX, y: t.clientY };
+  };
+
+  const handleWorkspaceTouchEnd = (e: React.TouchEvent) => {
+    const start = touchStartRef.current;
+    touchStartRef.current = null;
+    if (!start || window.innerWidth >= 768) return;
+
+    const t = e.changedTouches[0];
+    const deltaX = t.clientX - start.x;
+    const deltaY = t.clientY - start.y;
+    const SWIPE_THRESHOLD_PX = 80;
+
+    if (Math.abs(deltaX) < SWIPE_THRESHOLD_PX || Math.abs(deltaX) < Math.abs(deltaY) * 1.5) return;
+
+    const currentIndex = MOBILE_VIEW_ORDER.indexOf(mobileActiveView);
+    const nextIndex = deltaX < 0 ? currentIndex + 1 : currentIndex - 1;
+    if (nextIndex < 0 || nextIndex >= MOBILE_VIEW_ORDER.length) return;
+
+    setMobileActiveView(MOBILE_VIEW_ORDER[nextIndex]);
+  };
+
   // Last trip stamp (id + updated_at) this tab has synced to, used by the poller below
   const lastSeenStampRef = React.useRef<string | null>(null);
   const reloadFromDbRef = React.useRef<null | (() => Promise<void>)>(null);
@@ -414,7 +445,11 @@ export default function Home() {
         <Header />
 
         {/* Main Workspace Layout (Desktop Side-by-Side / Mobile Single View) */}
-        <div className="flex-1 flex flex-col md:flex-row overflow-visible md:overflow-hidden relative md:min-h-0">
+        <div
+          className="flex-1 flex flex-col md:flex-row overflow-visible md:overflow-hidden relative md:min-h-0"
+          onTouchStart={handleWorkspaceTouchStart}
+          onTouchEnd={handleWorkspaceTouchEnd}
+        >
           {/* Left Sidebar: Places Ingestion & Day-Off Filters */}
           <div className={`${mobileActiveView === 'PLACES' ? 'flex w-full' : 'hidden'} md:flex md:w-80 h-full shrink-0`}>
             <Sidebar />

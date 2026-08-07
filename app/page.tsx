@@ -66,32 +66,71 @@ export default function Home() {
   // tapping the bottom nav. Only acts on a clean, mostly-horizontal, decisive swipe so it
   // doesn't fight the scheduler's drag-and-drop or the map's own pan/pinch gestures.
   const MOBILE_VIEW_ORDER: Array<'PLACES' | 'SCHEDULER' | 'MAP'> = ['PLACES', 'SCHEDULER', 'MAP'];
-  const touchStartRef = React.useRef<{ x: number; y: number } | null>(null);
+  const workspaceRef = React.useRef<HTMLDivElement | null>(null);
+  const touchStateRef = React.useRef<{ x: number; y: number; horizontalLock: boolean } | null>(null);
 
-  const handleWorkspaceTouchStart = (e: React.TouchEvent) => {
-    if (window.innerWidth >= 768) return;
-    const t = e.touches[0];
-    touchStartRef.current = { x: t.clientX, y: t.clientY };
-  };
+  useEffect(() => {
+    const el = workspaceRef.current;
+    if (!el) return;
 
-  const handleWorkspaceTouchEnd = (e: React.TouchEvent) => {
-    const start = touchStartRef.current;
-    touchStartRef.current = null;
-    if (!start || window.innerWidth >= 768) return;
+    const onTouchStart = (e: TouchEvent) => {
+      if (window.innerWidth >= 768) return;
+      const t = e.touches[0];
+      touchStateRef.current = { x: t.clientX, y: t.clientY, horizontalLock: false };
+    };
 
-    const t = e.changedTouches[0];
-    const deltaX = t.clientX - start.x;
-    const deltaY = t.clientY - start.y;
-    const SWIPE_THRESHOLD_PX = 80;
+    const onTouchMove = (e: TouchEvent) => {
+      const state = touchStateRef.current;
+      if (!state || window.innerWidth >= 768) return;
+      const t = e.touches[0];
+      const deltaX = t.clientX - state.x;
+      const deltaY = t.clientY - state.y;
 
-    if (Math.abs(deltaX) < SWIPE_THRESHOLD_PX || Math.abs(deltaX) < Math.abs(deltaY) * 1.5) return;
+      if (!state.horizontalLock) {
+        // Once the gesture clearly reads as horizontal, take it over — this is what stops
+        // the page from also rubber-band/pan-scrolling underneath our swipe (the "화면이
+        // 왼쪽으로 치우친다" shift), since the browser never gets to touch-scroll it.
+        if (Math.abs(deltaX) > 15 && Math.abs(deltaX) > Math.abs(deltaY) * 1.5) {
+          state.horizontalLock = true;
+        } else if (Math.abs(deltaY) > 15) {
+          touchStateRef.current = null; // vertical scroll — let the browser handle it
+          return;
+        }
+      }
 
-    const currentIndex = MOBILE_VIEW_ORDER.indexOf(mobileActiveView);
-    const nextIndex = deltaX < 0 ? currentIndex + 1 : currentIndex - 1;
-    if (nextIndex < 0 || nextIndex >= MOBILE_VIEW_ORDER.length) return;
+      if (state.horizontalLock) {
+        e.preventDefault();
+      }
+    };
 
-    setMobileActiveView(MOBILE_VIEW_ORDER[nextIndex]);
-  };
+    const onTouchEnd = (e: TouchEvent) => {
+      const state = touchStateRef.current;
+      touchStateRef.current = null;
+      if (!state || window.innerWidth >= 768) return;
+
+      const t = e.changedTouches[0];
+      const deltaX = t.clientX - state.x;
+      const deltaY = t.clientY - state.y;
+      const SWIPE_THRESHOLD_PX = 80;
+
+      if (Math.abs(deltaX) < SWIPE_THRESHOLD_PX || Math.abs(deltaX) < Math.abs(deltaY) * 1.5) return;
+
+      const currentIndex = MOBILE_VIEW_ORDER.indexOf(mobileActiveView);
+      const nextIndex = deltaX < 0 ? currentIndex + 1 : currentIndex - 1;
+      if (nextIndex < 0 || nextIndex >= MOBILE_VIEW_ORDER.length) return;
+
+      setMobileActiveView(MOBILE_VIEW_ORDER[nextIndex]);
+    };
+
+    el.addEventListener('touchstart', onTouchStart, { passive: true });
+    el.addEventListener('touchmove', onTouchMove, { passive: false });
+    el.addEventListener('touchend', onTouchEnd, { passive: true });
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchmove', onTouchMove);
+      el.removeEventListener('touchend', onTouchEnd);
+    };
+  }, [mobileActiveView]);
 
   // Last trip stamp (id + updated_at) this tab has synced to, used by the poller below
   const lastSeenStampRef = React.useRef<string | null>(null);
@@ -446,9 +485,8 @@ export default function Home() {
 
         {/* Main Workspace Layout (Desktop Side-by-Side / Mobile Single View) */}
         <div
+          ref={workspaceRef}
           className="flex-1 flex flex-col md:flex-row overflow-visible md:overflow-hidden relative md:min-h-0"
-          onTouchStart={handleWorkspaceTouchStart}
-          onTouchEnd={handleWorkspaceTouchEnd}
         >
           {/* Left Sidebar: Places Ingestion & Day-Off Filters */}
           <div className={`${mobileActiveView === 'PLACES' ? 'flex w-full' : 'hidden'} md:flex md:w-80 h-full shrink-0`}>

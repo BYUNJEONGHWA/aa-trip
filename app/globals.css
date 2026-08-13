@@ -51,6 +51,17 @@ body {
     overflow: visible !important;
   }
 
+  /* The export view uses light text (text-white etc.) on dark card backgrounds
+     for on-screen viewing. Most browsers don't print background colors unless
+     "background graphics" is checked in the print dialog, which would leave that
+     light text invisible on the white page. Forcing color-adjust here makes the
+     backgrounds print regardless of that setting, so the text stays legible. */
+  #printable-area,
+  #printable-area * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
   /* Print only the export modal's itinerary. The modal is a fixed-position,
      height-capped, internally-scrolling overlay built for on-screen viewing, and it
      sits on top of the rest of the app (sidebar, map, scheduler) rather than replacing

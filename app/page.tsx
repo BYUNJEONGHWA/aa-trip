@@ -49,6 +49,7 @@ export default function Home() {
     places,
     addPlaces,
     activeDayIndex,
+    setActiveDayIndex,
     isDbInitialLoaded,
     setIsDbInitialLoaded,
     loadFullTripState,
@@ -68,6 +69,14 @@ export default function Home() {
   const MOBILE_VIEW_ORDER: Array<'PLACES' | 'SCHEDULER' | 'MAP'> = ['PLACES', 'SCHEDULER', 'MAP'];
   const workspaceRef = React.useRef<HTMLDivElement | null>(null);
   const touchStateRef = React.useRef<{ x: number; y: number; horizontalLock: boolean } | null>(null);
+
+  // Kept fresh every render without going in the touch effect's deps below - that effect
+  // only needs to re-bind its listeners when mobileActiveView changes, not on every
+  // schedule edit (which would otherwise thrash addEventListener on each keystroke).
+  const dayItinerariesRef = React.useRef(dayItineraries);
+  dayItinerariesRef.current = dayItineraries;
+  const activeDayIndexRef = React.useRef(activeDayIndex);
+  activeDayIndexRef.current = activeDayIndex;
 
   useEffect(() => {
     const el = workspaceRef.current;
@@ -114,6 +123,22 @@ export default function Home() {
       const SWIPE_THRESHOLD_PX = 80;
 
       if (Math.abs(deltaX) < SWIPE_THRESHOLD_PX || Math.abs(deltaX) < Math.abs(deltaY) * 1.5) return;
+
+      // Inside the Scheduler, a swipe changes day first (so you don't have to scroll
+      // back up to the day tabs) - it only falls through to switching the 보관장소/지도
+      // tab once you're already at the first/last day, same as before.
+      if (mobileActiveView === 'SCHEDULER') {
+        const sortedDays = [...dayItinerariesRef.current].sort((a, b) => a.dayIndex - b.dayIndex);
+        const dayPos = sortedDays.findIndex((d) => d.dayIndex === activeDayIndexRef.current);
+        const nextDay = sortedDays[dayPos + (deltaX < 0 ? 1 : -1)];
+        if (nextDay) {
+          setActiveDayIndex(nextDay.dayIndex);
+          // Otherwise the new day renders wherever the previous day happened to be
+          // scrolled to, which can hide its first cards below the fold.
+          document.getElementById('app-root')?.scrollTo({ top: 0, behavior: 'smooth' });
+          return;
+        }
+      }
 
       const currentIndex = MOBILE_VIEW_ORDER.indexOf(mobileActiveView);
       const nextIndex = deltaX < 0 ? currentIndex + 1 : currentIndex - 1;
